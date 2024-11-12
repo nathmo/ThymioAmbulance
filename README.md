@@ -192,6 +192,3 @@ class PositionEstimator:
 
 ```
 
-+41 78 350 07 28
-projet mardi 18h
-
