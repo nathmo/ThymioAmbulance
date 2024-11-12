@@ -39,7 +39,7 @@ deal with the hardware + realtime
 - allow the update of the estimated position
 - get a list of waypoint and follow them.
 
-# Work package 1)
+# Work package 1) -> Seif
 python class for robot movement.
 this is the fast loop. 
 It run in its own thread and handle to robot movement  + communication and local obstacle avoidance. 
@@ -93,7 +93,7 @@ make your code robust and failproof to connection problem to the robot. (expect 
 
 (ask chatGPT to generate a main and a thread and call the update function from the thread at 100 Hz/ every 10ms), make sure your mutex work when you update the waypoints/position
 
-# Work package 2)
+# Work package 2) -> Felipe
 the goal if to use openCV to find the position and orientation of the objects on the map.
 The camera will be look at the floor and can see the whole map.
 This module will return the position and orientation of the robot + a NxM matrix with the space occupancy of the map (used for path planning) + the position and orientation of the crash.
@@ -148,7 +148,7 @@ class VisionSystem:
 ```
 To demonstrate how your system work, use the visualisation helper tool (made by the person in charge of work package 4) that render both the robot/goal and the numpy array for the grid. try to play with the lightning, add noise to the picture, etc to see how your  algorithm behave with edge case (people in work package 3 also need a similar too, 
 
-# Work package 3)
+# Work package 3) -> Paul-Antoine
 the goal is to compute the path planning using the current position + goal position and the matrix of occupancy and return a serie of waypoint for the robot to follow
 
 ensure that the bounding box of the robot do not colide when following the waypoint.
@@ -173,7 +173,7 @@ class PathPlanner:
 To demonstrate how your system work, use the a visualisation tool that render both the waypoint and the numpy array made by work package 4. try to pregen a few true/false map to see how your algorithm behave with edge case (no path exist, multiple path of same lenght exist, very short path, very large map and or Long path )
 
 
-# Work package 4)
+# Work package 4) -> Nathann
 Slow loop and sensor fusion/kalman filter
 
 the goal is to use all the function made by others and 
