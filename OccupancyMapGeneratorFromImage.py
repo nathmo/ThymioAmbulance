@@ -65,7 +65,7 @@ def image_to_boolean_matrix(image_path, crop_box=None, scale_size=(500, 500), th
 
 # Example usage
 if __name__ == "__main__":
-    # THis tool allow you to draw a map using paint and export it to a .txt. there is a function to import the .txt back to a numpy array.
+    # This tool allow you to draw a map using paint and export it to a .txt. there is a function to import the .txt back to a numpy array.
     # the parameter scale size allow you to crop and scale the original picture ot make a smaller matrix.
     matrix = image_to_boolean_matrix("testData\mapWithBlackObstacle1.PNG")
     export_matrix_to_txt(matrix, "testData\mapWithBlackObstacle1.txt")

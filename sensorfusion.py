@@ -9,5 +9,5 @@ class SensorFusion:
     def get_estimated_position(self, encoder_position, encoder_speed, camera_position):
         # Calculate and return a refined position estimate using sensor fusion (e.g., Kalman filter)
         # This example returns a fixed position; replace with actual fusion logic as needed
-        estimated_position = np.array([160, 202, np.pi / 6.05])
+        estimated_position = np.array([4060, 4002, np.pi / 6.05])
         return estimated_position
