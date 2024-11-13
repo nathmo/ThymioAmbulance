@@ -61,7 +61,7 @@ class SensorFusion:
         self.y_filter.update(camera_position[1], measurement_noise)
 
         # 3. Update theta filter
-        self.theta_filter.predict(delta_t, 0, encoder_speed[2])  # Only consider angular speed (omega)
+        self.theta_filter.predict(delta_t, encoder_speed[2], 0)  # Only consider angular speed (omega)
         self.theta_filter.update(camera_position[2], measurement_noise)
 
         # Resample each filter's particles
@@ -86,8 +86,25 @@ def test_sensor_fusion():
     time_step = 1  # seconds
     time_simulation = np.arange(0, num_steps * time_step, time_step)
 
+    # Time steps (e.g., from 0 to 49)
+    t = np.arange(num_steps)
+
+    # Offsets for each axis (you can customize them as needed)
+    offset_x = 4
+    offset_y = 2
+    offset_theta = 5
+
+    # Generate the speed for each axis
+    speed_x = offset_x* np.sin(t/4+5) ** 2 + np.random.randn(num_steps) * 0.1
+    speed_y = offset_y*np.sin(t/2-3) ** 2 + np.random.randn(num_steps) * 0.1
+    speed_theta = offset_theta*np.sin(t/5+20)
+
+    # Bundle speeds into a list (or any other format you prefer)
+    true_speed = [np.array([speed_x[i], speed_y[i], speed_theta[i]]) for i in range(num_steps)]
+
     # Generate constant speed and linearly increasing encoder positions
-    true_speed = np.array([50, 1, 0.1])  # Constant speed [vx, vy, omega]
+    #true_speed = [np.array([50, 1, 0.1])]  # Constant speed [vx, vy, omega]
+    print(true_speed)
     true_position = np.array([0.0, 0.0, 0.0])
     # Arrays to store the simulation results
     true_positions = []
@@ -96,12 +113,17 @@ def test_sensor_fusion():
     encoder_positions = []
 
     # Simulation loop
+    start_time = time.time()
+
+    # Loop to simulate robot movement and sensor fusion
     for t in range(num_steps):
-        true_position += true_speed * time_step
+        loop_start_time = time.time()  # Start time of each iteration
+        true_position += true_speed[t] * time_step
         true_positions.append(true_position.copy())
         camera_position = true_position * np.random.normal(1.0, 0.1, size=3)  # 10% error position from camera
         encoder_position = true_position * np.random.normal(1.0, 0.1, size=3)  # 10% error position from encoder
-        encoder_speed = true_speed * np.random.normal(1.0, 0.1, size=3)  # 10% error position from encoder
+        encoder_speed = true_speed[t] * np.random.normal(1.0, 0.1, size=3)  # 10% error speed from encoder
+
         estimated_position = sensor_fusion.get_estimated_position(
             encoder_position, encoder_speed, camera_position
         )
@@ -110,7 +132,18 @@ def test_sensor_fusion():
         camera_positions.append(camera_position)
         encoder_positions.append(encoder_position)
 
-    print(true_positions)
+        # Calculate the time taken for this iteration and store it
+        loop_end_time = time.time()  # End time of the current iteration
+        loop_duration = loop_end_time - loop_start_time  # Time taken for this iteration
+
+    # After the loop, calculate and print the average time per iteration
+    end_time = time.time()
+    total_duration = end_time - start_time
+    average_time_per_iteration = total_duration / num_steps
+
+    print(f"Total time for {num_steps} iterations: {total_duration:.2f} seconds")
+    print(f"Average time per iteration: {average_time_per_iteration:.6f} seconds")
+    # Average time per iteration: 0.004697 seconds on my small tablet...
     true_positions = np.array(true_positions)
     estimated_positions = np.array(estimated_positions)
     camera_positions = np.array(camera_positions)
