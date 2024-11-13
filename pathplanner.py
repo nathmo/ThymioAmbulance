@@ -1,3 +1,4 @@
+import numpy as np
 class PathPlanner:
     #
     def get_waypoints(occupancy_grid, start, target):

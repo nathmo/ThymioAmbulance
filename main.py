@@ -1,7 +1,10 @@
 import threading
 import time
 from robotmovement import RobotMovement
-
+from visionsystem import VisionSystem
+from sensorfusion import SensorFusion
+from pathplanner import PathPlanner
+import numpy as np
 
 def update_loop(robot):
     """Function to run robot.update() in a separate thread at ~100 Hz."""
@@ -21,8 +24,10 @@ def update_loop(robot):
         time.sleep(sleep_time)
 
 def main():
-    # Create an instance of RobotMovement
+    #
     robot = RobotMovement()
+    vision = VisionSystem()
+    sensorfusion = SensorFusion()
     # Start a separate thread for the update loop
     update_thread = threading.Thread(target=update_loop, args=(robot,))
     update_thread.daemon = True  # Daemonize thread to exit when main program exits
@@ -38,8 +43,29 @@ def main():
         - use path planning to find best way (A*)
         - update robot movement instruction
         '''
+        if(vision.is_camera_ready()):
+            robotPosFromCamera = vision.get_robot_position()
+            goalPosFromCamera = vision.get_goal_position()
+            occupancyGrid = vision.generate_occupancy_grid()
+            robotPosFromEncoder = robot.get_position()
+            robotSpeedFromEncoder = robot.get_speed()
+            robotPosFromFusion = sensorfusion.get_estimated_position(robotPosFromEncoder, robotSpeedFromEncoder, robotPosFromCamera)
+            waypoints = PathPlanner.get_waypoints(occupancyGrid, robotPosFromFusion, goalPosFromCamera)
+            robot.set_position(robotPosFromFusion)
+            robot.set_waypoints(waypoints)
+            print("Main ran and have the following intermediate value : ")
+            print("waypoints : " + str(waypoints))
+            print("number of waypoints : " + str(len(waypoints)))
+            print("robotPosFromCamera : "+str(robotPosFromCamera))
+            print(" + robotPosFromEncoder : " + str(robotPosFromEncoder))
+            print(" = robotPosFromFusion : " + str(robotPosFromFusion))
+            print("robotSpeedFromEncoder : " + str(robotSpeedFromEncoder))
+            print("goalPosFromCamera : " + str(goalPosFromCamera))
+            print("---------------------------------------------------------")
+        else:
+            print("camera Not Ready")
 
-        print("Main loop running...")
+
         time.sleep(1)  # Adjust the main loop's frequency as needed
 
 if __name__ == "__main__":

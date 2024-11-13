@@ -1,2 +1,5 @@
 opencv-python-headless #add here the library you need, one per line
 opencv-python
+numpy
+PIL
+matplotlib
