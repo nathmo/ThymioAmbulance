@@ -58,7 +58,7 @@ class VisionSystem:
             robot_position = None
 
             for i, marker_id in enumerate(ids.flatten()):
-                if marker_id == 4: #check si on a bien 4 marqueurs
+                if marker_id == 5: #check si on a bien 4 marqueurs
                     x, y = tvecs[i][0][:2] * 1000 #[:2] nous permet de prendre que x et y sans z
 
                     # Utilisation d'une approche simplifiée pour l'orientation
@@ -102,10 +102,10 @@ class VisionSystem:
 def display_first_five_aruco_markers():
     aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_6X6_250)
 
-    for i in range(5):  # Affiche les 5 premiers marqueurs de 0 à 4
+    for i in range(6):  # Affiche les 5 premiers marqueurs de 0 à 5
         marker_image = cv2.aruco.generateImageMarker(aruco_dict, i, 200)
 
-        cv2.imwrite(f'testData\Marqueur {i}.png', marker_image)
+        cv2.imwrite(f'Marqueur {i}.png', marker_image)
 
 
 
