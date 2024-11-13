@@ -3,56 +3,78 @@ import numpy as np
 import time
 import matplotlib.pyplot as plt
 
+
+class ParticleFilter:
+    def __init__(self, num_particles, range_min, range_max):
+        self.num_particles = num_particles
+        self.particles = np.random.uniform(range_min, range_max, size=(self.num_particles, 1))
+        self.weights = np.ones(self.num_particles) / self.num_particles
+
+    def predict(self, delta_t, speed, angular_velocity):
+        # Move particles based on speed and angular velocity
+        noise = np.random.randn(self.num_particles) * 0.1  # Adding noise to the prediction
+        self.particles[:, 0] += speed * delta_t + noise
+
+    def update(self, sensor_position, measurement_noise):
+        # Update particle weights based on sensor measurements
+        dist = np.abs(self.particles[:, 0] - sensor_position)
+        likelihood = np.exp(-0.5 * (dist ** 2 / measurement_noise ** 2))
+        self.weights = likelihood
+
+        # Normalize the weights so that they sum to 1
+        weight_sum = np.sum(self.weights)
+        if weight_sum < 1e-10:
+            self.weights = np.ones(self.num_particles) / self.num_particles
+        else:
+            self.weights /= weight_sum
+
+    def resample(self):
+        # Resample particles based on updated weights
+        indices = np.random.choice(range(self.num_particles), size=self.num_particles, p=self.weights)
+        self.particles = self.particles[indices]
+        self.weights = np.ones(self.num_particles) / self.num_particles  # Reset weights
+
+    def estimate(self):
+        # Estimate position as the mean of the particles
+        return np.mean(self.particles)
+
+
 class SensorFusion:
-    def __init__(self):
-        # Initialize Kalman filter for a 6D state: [x, y, theta, vx, vy, omega]
-        self.kf = KalmanFilter(dim_x=6, dim_z=6)
+    def __init__(self, num_particles=10000, x_range=(0, 1000), y_range=(0, 1000), theta_range=(-np.pi, np.pi)):
+        # Number of particles for each filter
+        self.num_particles = num_particles
 
-        # State vector [x, y, theta, vx, vy, omega]
-        self.kf.x = np.array([0, 0, 0, 0, 0, 0])
+        # Initialize three particle filters (one for x, one for y, one for theta)
+        self.x_filter = ParticleFilter(self.num_particles, [x_range[0]], [x_range[1]])
+        self.y_filter = ParticleFilter(self.num_particles, [y_range[0]], [y_range[1]])
+        self.theta_filter = ParticleFilter(self.num_particles, [theta_range[0]], [theta_range[1]])
 
+    def get_estimated_position(self, encoder_position, encoder_speed, camera_position, delta_t=1.0,
+                               measurement_noise=1.0):
+        # Update each particle filter with the corresponding sensor data
+        # 1. Update x filter
+        self.x_filter.predict(delta_t, encoder_speed[0], 0)  # Only consider speed along x
+        self.x_filter.update(camera_position[0], measurement_noise)
 
-        self.kf.F = np.array([[1, 0, 0, 0, 0, 0],
-                              [0, 1, 0, 0, 0, 0],
-                              [0, 0, 1, 0, 0, 0],
-                              [0, 0, 0, 1, 0, 0],
-                              [0, 0, 0, 0, 1, 0],
-                              [0, 0, 0, 0, 0, 1]])
+        # 2. Update y filter
+        self.y_filter.predict(delta_t, encoder_speed[1], 0)  # Only consider speed along y
+        self.y_filter.update(camera_position[1], measurement_noise)
 
-        # Measurement function (H) - now observing [x, y, theta, vx, vy, omega] directly
-        self.kf.H = np.array([[1, 0, 0, 0, 0, 0],
-                              [0, 1, 0, 0, 0, 0],
-                              [0, 0, 1, 0, 0, 0],
-                              [0, 0, 0, 1, 0, 0],
-                              [0, 0, 0, 0, 1, 0],
-                              [0, 0, 0, 0, 0, 1]])
+        # 3. Update theta filter
+        self.theta_filter.predict(delta_t, 0, encoder_speed[2])  # Only consider angular speed (omega)
+        self.theta_filter.update(camera_position[2], measurement_noise)
 
-        # Measurement noise covariance (R) for each measurement component (position)
-        # We assume the camera and encoder have similar noise characteristics for position measurements
-        self.kf.R = np.diag([1e-1, 1e-1, 1e-1, 1e-1, 1e-1, 1e-1])  # Ignoring speed measurements
+        # Resample each filter's particles
+        self.x_filter.resample()
+        self.y_filter.resample()
+        self.theta_filter.resample()
 
-        # Process noise covariance (Q), reflecting model uncertainty
-        self.kf.Q = np.eye(6) * 1e-1
+        # Estimate the final position as the weighted mean of each filter's particles
+        estimated_x = self.x_filter.estimate()
+        estimated_y = self.y_filter.estimate()
+        estimated_theta = self.theta_filter.estimate()
 
-        # Initial error covariance (P), reflects initial uncertainty in state estimates
-        self.kf.P *= 0.1
-
-    def get_estimated_position(self, encoder_position, encoder_speed, camera_position):
-        # Prediction Step
-        self.kf.predict()
-
-        # Measurement vector (z) - combining both sensor positions
-        z = np.array([camera_position[0], camera_position[1], camera_position[2],
-                      encoder_position[0], encoder_position[1], encoder_position[2]])
-
-        # Update Step with the combined measurement vector
-        self.kf.update(z)
-
-        # Extract estimated [x, y, theta] from the state vector
-        estimated_position = self.kf.x[:3]  # [x, y, theta]
-
-        # Return estimated position
-        return estimated_position
+        return np.array([estimated_x, estimated_y, estimated_theta])
 
 
 def test_sensor_fusion():
@@ -64,12 +86,8 @@ def test_sensor_fusion():
     time_step = 1  # seconds
     time_simulation = np.arange(0, num_steps * time_step, time_step)
 
-    # Adjustable dropout duration
-    dropout_duration = 1  # Number of steps for camera dropout
-
     # Generate constant speed and linearly increasing encoder positions
-    encoder_speed = np.array([500, 3, 0.02])  # Constant speed [vx, vy, omega]
-    encoder_position = np.array([0.0, 0.0, 0.0])
+    true_speed = np.array([50, 1, 0.1])  # Constant speed [vx, vy, omega]
     true_position = np.array([0.0, 0.0, 0.0])
     # Arrays to store the simulation results
     true_positions = []
@@ -79,10 +97,11 @@ def test_sensor_fusion():
 
     # Simulation loop
     for t in range(num_steps):
-        true_position += encoder_speed * time_step
+        true_position += true_speed * time_step
         true_positions.append(true_position.copy())
         camera_position = true_position * np.random.normal(1.0, 0.1, size=3)  # 10% error position from camera
         encoder_position = true_position * np.random.normal(1.0, 0.1, size=3)  # 10% error position from encoder
+        encoder_speed = true_speed * np.random.normal(1.0, 0.1, size=3)  # 10% error position from encoder
         estimated_position = sensor_fusion.get_estimated_position(
             encoder_position, encoder_speed, camera_position
         )
