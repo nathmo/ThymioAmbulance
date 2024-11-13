@@ -1,11 +1,32 @@
 import numpy as np
+import cv2
+
 class VisionSystem:
     def __init__(self):
         return None# Initialize camera and other parameters
 
     def is_camera_ready(self):
         # Check if the camera is ready (returns True or False)
-        return True  # or False if the camera is not ready
+        cap = cv2.VideoCapture(0)
+
+        if cap.isOpened():
+            return True
+        else:
+            return False # if the camera is not ready
+
+    def capture_frame(self):
+        if not self.is_camera_ready():
+            return None
+
+        cap = cv2.VideoCapture(0)
+        capture, frame = cap.read() #capture = bouleen and frame = (hauteur, largeur, nbr_colorRGB_use)
+
+        if capture:
+            cap.release()
+            return frame
+        else:
+            cap.release()
+            return None
 
     def get_robot_position(self):
         # Use OpenCV to detect robot’s position and orientation
