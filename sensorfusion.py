@@ -10,8 +10,8 @@ class ParticleFilter:
         self.particles = np.random.uniform(range_min, range_max, size=(self.num_particles, 1))
         self.weights = np.ones(self.num_particles) / self.num_particles
 
-    def predict(self, delta_t, speed, angular_velocity):
-        # Move particles based on speed and angular velocity
+    def predict(self, delta_t, speed):
+        # Move particles based on speed or angular velocity
         noise = np.random.randn(self.num_particles) * 0.1  # Adding noise to the prediction
         self.particles[:, 0] += speed * delta_t + noise
 
@@ -49,20 +49,65 @@ class SensorFusion:
         self.y_filter = ParticleFilter(self.num_particles, [y_range[0]], [y_range[1]])
         self.theta_filter = ParticleFilter(self.num_particles, [theta_range[0]], [theta_range[1]])
 
+    def is_valid(self, value, min_val=1, max_val=10000):
+        # assomption that we will never make more than 10m before the system update
+        """Check if the sensor value is within a valid range."""
+        return min_val <= value <= max_val
+
     def get_estimated_position(self, encoder_position, encoder_speed, camera_position, delta_t=1.0,
                                measurement_noise=1.0):
-        # Update each particle filter with the corresponding sensor data
-        # 1. Update x filter
-        self.x_filter.predict(delta_t, encoder_speed[0], 0)  # Only consider speed along x
-        self.x_filter.update(camera_position[0], measurement_noise)
+        # Update x filter
+        if self.is_valid(camera_position[0]) and self.is_valid(encoder_position[0], min_val=0):
+            # If both the camera and encoder values are valid, use the average
+            updated_position = (camera_position[0] + encoder_position[0]) / 2
+            self.x_filter.update(updated_position, measurement_noise)
+        elif self.is_valid(camera_position[0]):
+            # If only the camera value is valid, use it
+            updated_position = camera_position[0]
+            self.x_filter.update(updated_position, measurement_noise)
+        elif self.is_valid(encoder_position[0], min_val=0):
+            # If only the encoder value is valid, use it
+            updated_position = encoder_position[0]
+            self.x_filter.update(updated_position, measurement_noise)
+        else:
+            None# at this point there is no miracle to be done..., dont update
 
-        # 2. Update y filter
-        self.y_filter.predict(delta_t, encoder_speed[1], 0)  # Only consider speed along y
-        self.y_filter.update(camera_position[1], measurement_noise)
+        # Update the filter with the determined position
+        self.x_filter.predict(delta_t, encoder_speed[0])  # Only consider speed along x
 
-        # 3. Update theta filter
-        self.theta_filter.predict(delta_t, encoder_speed[2], 0)  # Only consider angular speed (omega)
-        self.theta_filter.update(camera_position[2], measurement_noise)
+
+        # Update y filter
+        if self.is_valid(camera_position[1]) and self.is_valid(encoder_position[1], min_val=0):
+            updated_position = (camera_position[1] + encoder_position[1]) / 2
+            self.y_filter.update(updated_position, measurement_noise)
+        elif self.is_valid(camera_position[1]):
+            updated_position = camera_position[1]
+            self.y_filter.update(updated_position, measurement_noise)
+        elif self.is_valid(encoder_position[1], min_val=0):
+            updated_position = encoder_position[1]
+            self.y_filter.update(updated_position, measurement_noise)
+        else:
+            None# at this point there is no miracle to be done..., dont update
+
+        self.y_filter.predict(delta_t, encoder_speed[1])  # Only consider speed along y
+
+
+        # Update theta filter
+        if self.is_valid(camera_position[2], min_val=-np.pi, max_val=np.pi) and \
+                self.is_valid(encoder_position[2], min_val=-np.pi, max_val=np.pi):
+            updated_position = (camera_position[2] + encoder_position[2]) / 2
+            self.theta_filter.update(updated_position, measurement_noise)
+        elif self.is_valid(camera_position[2], min_val=-np.pi, max_val=np.pi):
+            updated_position = camera_position[2]
+            self.theta_filter.update(updated_position, measurement_noise)
+        elif self.is_valid(encoder_position[2], min_val=-np.pi, max_val=np.pi):
+            updated_position = encoder_position[2]
+            self.theta_filter.update(updated_position, measurement_noise)
+        else:
+            None# at this point there is no miracle to be done..., dont update
+
+        self.theta_filter.predict(delta_t, encoder_speed[2])  # Only consider angular speed (omega)
+
 
         # Resample each filter's particles
         self.x_filter.resample()
@@ -90,7 +135,7 @@ def test_sensor_fusion():
     t = np.arange(num_steps)
 
     # Offsets for each axis (you can customize them as needed)
-    offset_x = 4
+    offset_x = 8
     offset_y = 2
     offset_theta = 5
 
@@ -120,9 +165,9 @@ def test_sensor_fusion():
         loop_start_time = time.time()  # Start time of each iteration
         true_position += true_speed[t] * time_step
         true_positions.append(true_position.copy())
-        camera_position = true_position * np.random.normal(1.0, 0.1, size=3)  # 10% error position from camera
-        encoder_position = true_position * np.random.normal(1.0, 0.1, size=3)  # 10% error position from encoder
-        encoder_speed = true_speed[t] * np.random.normal(1.0, 0.1, size=3)  # 10% error speed from encoder
+        camera_position = true_position * np.random.normal(1.0, 0.2, size=3)  # 10% error position from camera
+        encoder_position = true_position * np.random.normal(1.0, 0.2, size=3)  # 10% error position from encoder
+        encoder_speed = true_speed[t] * np.random.normal(1.0, 0.2, size=3)  # 10% error speed from encoder
 
         estimated_position = sensor_fusion.get_estimated_position(
             encoder_position, encoder_speed, camera_position
