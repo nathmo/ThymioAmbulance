@@ -51,3 +51,29 @@ class VisionSystem:
             matrix.append(row)
 
         return np.array(matrix)  # Convert the list of lists into a NumPy array
+
+
+def display_first_five_aruco_markers():
+    aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_6X6_250)
+
+    for i in range(5):  # Affiche les 5 premiers marqueurs de 0 à 4
+        marker_image = cv2.aruco.generateImageMarker(aruco_dict, i, 200)
+
+        cv2.imwrite(f'result\Marqueur {i}.png', marker_image)
+
+
+
+def visionmain():
+
+    print("create vision object")
+    visionsystem = VisionSystem()
+    print("take a picture")
+    frame = visionsystem.capture_frame()
+    print("save picture")
+    cv2.imwrite('result\captured_frame.png', frame)  # Save to file result
+
+
+
+if __name__ == "__main__":
+    #visionmain()
+    display_first_five_aruco_markers()
