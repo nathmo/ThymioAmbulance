@@ -38,6 +38,7 @@ def main():
         - use path planning to find best way (A*)
         - update robot movement instruction
         '''
+
         print("Main loop running...")
         time.sleep(1)  # Adjust the main loop's frequency as needed
 
