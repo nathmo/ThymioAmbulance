@@ -5,7 +5,7 @@ class VisionSystem:
     def __init__(self):
         # Charger le dictionnaire de marqueurs (DICT_6X6_250 contient 250 marqueurs uniques)
         self.aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_6X6_250)
-        self.parameters = cv2.aruco.DetectorParameters_create()
+        self.parameters = cv2.aruco.DetectorParameters()
 
         # Paramètres de la caméra (à remplacer par les valeurs de calibration si disponibles)
         self.camera_matrix = np.array([[800, 0, 320], [0, 800, 240], [0, 0, 1]], dtype=float)
@@ -124,8 +124,34 @@ class VisionSystem:
         # True means the space is occupied, False means it's free
         # Grid layout: 0,0 is the lower left corner, rows are along x and columns along y
 
+        # Étape 1: Convertir l'image en niveaux de gris
+        gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
+        # Étape 2: Appliquer un filtre pour accentuer les objets (optionnel)
+        # Ici on applique un flou gaussien pour réduire le bruit
+        blurred_frame = cv2.GaussianBlur(gray_frame, (5, 5), 0)
 
+        # Étape 3: Appliquer un seuillage pour binariser l'image
+        # Utilisation de la méthode de seuillage Otsu pour déterminer automatiquement le seuil
+        _, binary_frame = cv2.threshold(blurred_frame, 0, 1, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+
+        return binary_frame
+
+    cap = cv2.VideoCapture(0)
+    ret, frame = cap.read()
+
+    if ret:
+        binary_matrix = frame_to_binary_matrix(frame)
+        print(binary_matrix)  # Afficher la matrice binaire composée de 0 et 1
+
+        # Afficher l'image binaire pour vérifier le résultat
+        cv2.imshow('Binary Frame', binary_matrix * 255)
+        cv2.waitKey(0)
+
+    cap.release()
+    cv2.destroyAllWindows()
+
+    '''
         matrix = []
         for i in range(120):  # Set grid dimensions as required
             row = []
@@ -134,7 +160,7 @@ class VisionSystem:
             matrix.append(row)
 
         return np.array(matrix)  # Convert the list of lists into a NumPy array
-
+    '''
 
 def display_first_five_aruco_markers():
     aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_6X6_250)
@@ -158,5 +184,5 @@ def visionmain():
 
 
 if __name__ == "__main__":
-    #visionmain()
+    visionmain()
     display_first_five_aruco_markers()
