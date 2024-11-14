@@ -89,11 +89,9 @@ class VisionSystem:
             print("Erreur lors de la capture de la frame.")
             return None
 
-        # Détection des marqueurs aruco
         corners, ids, _ = cv2.aruco.detectMarkers(frame, self.aruco_dict, parameters=self.parameters)
 
         if ids is not None:
-            # Conversion en un tableau à une seule dimension pour faciliter les vérifications
             ids = ids.flatten()
 
             # Vérification de la présence des marqueurs nécessaires (0, 1, 2, 3 pour les coins et 5 pour l'objectif)
@@ -104,7 +102,6 @@ class VisionSystem:
                 print("Tous les marqueurs nécessaires ne sont pas détectés.")
                 return None
 
-            # Estimation de la pose pour tous les marqueurs détectés
             rvecs, tvecs, _ = cv2.aruco.estimatePoseSingleMarkers(corners, self.marker_length, self.camera_matrix,
                                                                   self.dist_coeffs)
 
