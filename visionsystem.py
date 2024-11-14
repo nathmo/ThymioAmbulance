@@ -124,6 +124,8 @@ class VisionSystem:
         # True means the space is occupied, False means it's free
         # Grid layout: 0,0 is the lower left corner, rows are along x and columns along y
 
+
+
         matrix = []
         for i in range(120):  # Set grid dimensions as required
             row = []
