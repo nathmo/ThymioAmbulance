@@ -82,7 +82,45 @@ class VisionSystem:
     def get_goal_position(self):
         # Detect and return the goal position
         # The positioning is absolute and explained in generate_occupancy_grid
-        return np.array([100, 150, np.pi / 6])  # x=100mm, y=150mm, direction=30° (π/6 radians)
+        # return np.array([100, 150, np.pi / 6])  # x=100mm, y=150mm, direction=30° (π/6 radians)
+
+        frame = self.capture_frame()
+        if frame is None:
+            print("Erreur lors de la capture de la frame.")
+            return None
+
+        # Détection des marqueurs aruco
+        corners, ids, _ = cv2.aruco.detectMarkers(frame, self.aruco_dict, parameters=self.parameters)
+
+        if ids is not None:
+            # Conversion en un tableau à une seule dimension pour faciliter les vérifications
+            ids = ids.flatten()
+
+            # Vérification de la présence des marqueurs nécessaires (0, 1, 2, 3 pour les coins et 5 pour l'objectif)
+            required_markers = {0, 1, 2, 3, 5}
+            detected_markers = set(ids)
+
+            if not required_markers.issubset(detected_markers):
+                print("Tous les marqueurs nécessaires ne sont pas détectés.")
+                return None
+
+            # Estimation de la pose pour tous les marqueurs détectés
+            rvecs, tvecs, _ = cv2.aruco.estimatePoseSingleMarkers(corners, self.marker_length, self.camera_matrix,
+                                                                  self.dist_coeffs)
+
+            # Détermination de la position de l'objectif (marqueur 5)
+            for i, marker_id in enumerate(ids):
+                if marker_id == 5:
+                    x, y = tvecs[i][0][:2] * 1000  # [:2] permet de prendre uniquement x et y sans z
+                    orientation = 0  # Utilisation d'une valeur fixe pour l'orientation
+                    return np.array([x, y, orientation])
+
+        else:
+            print("Aucun marqueur détecté.")
+            return None
+
+
+
 
     def generate_occupancy_grid(self):
         # Create and return an NxM occupancy grid based on the map layout
