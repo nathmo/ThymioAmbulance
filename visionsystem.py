@@ -1,5 +1,6 @@
 import numpy as np
 import cv2
+from helper import *
 
 class VisionSystem:
     def __init__(self):
@@ -13,6 +14,9 @@ class VisionSystem:
 
         # Longueur du côté du marqueur en mètres
         self.marker_length = 0.05
+
+        self.use_camera = use_camera  # Booléen true si on utilise camera, false si on veut utiliser image
+        self.image_path = "testData\Image_iphone_path.png" # Chemin de l'image si use_camera est False
 
         return None# Initialize camera and other parameters
 
@@ -39,16 +43,27 @@ class VisionSystem:
             cap.release()
             return None
 
+    def get_frame(self):
+        #Function qui determine si on prend camera ou frame imposé
+        if self.use_camera:
+            print("Utilisation de la caméra...")
+            frame = self.capture_frame()
+            if frame is None:
+                print("Erreur lors de la capture de la frame depuis la caméra.")
+            return frame
+        else:
+            print(f"Chargement de l'image depuis {self.image_path}...")
+            frame = cv2.imread(self.image_path)
+            if frame is None:
+                print(f"Erreur : Impossible de charger l'image depuis {self.image_path}.")
+            return frame
+
     def get_robot_position(self):
         # Use OpenCV to detect robot’s position and orientation
         # Example position and orientation
         # return np.array([100, 150, np.pi / 6])  # x=100mm, y=150mm, direction=30° (π/6 radians)
 
-        frame = self.capture_frame()
-        if frame is None:
-            print("Erreur lors de la capture de la frame.")
-            return None
-
+        frame = self.get_frame() #prendre image qu'on veut camera ou image
         corners, ids, _ = cv2.aruco.detectMarkers(frame, self.aruco_dict, parameters=self.parameters)
 
         if ids is not None:
@@ -75,7 +90,7 @@ class VisionSystem:
                 print("Marqueur du robot non détecté.")
                 return None
         else:
-            print("Aucun marqueur détecté.")
+            print("Aucun marqueur Robot détecté.")
             return None
 
 
@@ -84,11 +99,7 @@ class VisionSystem:
         # The positioning is absolute and explained in generate_occupancy_grid
         # return np.array([100, 150, np.pi / 6])  # x=100mm, y=150mm, direction=30° (π/6 radians)
 
-        frame = self.capture_frame()
-        if frame is None:
-            print("Erreur lors de la capture de la frame.")
-            return None
-
+        frame = self.get_frame() #prendre image qu'on veut camera ou image
         corners, ids, _ = cv2.aruco.detectMarkers(frame, self.aruco_dict, parameters=self.parameters)
 
         if ids is not None:
@@ -99,7 +110,8 @@ class VisionSystem:
             detected_markers = set(ids)
 
             if not required_markers.issubset(detected_markers):
-                print("Tous les marqueurs nécessaires ne sont pas détectés.")
+                print("Tous les marqueurs dans goal nécessaires ne sont pas détectés.")
+                print()
                 return None
 
             rvecs, tvecs, _ = cv2.aruco.estimatePoseSingleMarkers(corners, self.marker_length, self.camera_matrix,
@@ -113,7 +125,7 @@ class VisionSystem:
                     return np.array([x, y, orientation])
 
         else:
-            print("Aucun marqueur détecté.")
+            print("Aucun marqueur goal détecté.")
             return None
 
 
@@ -123,6 +135,8 @@ class VisionSystem:
         # Create and return an NxM occupancy grid based on the map layout
         # True means the space is occupied, False means it's free
         # Grid layout: 0,0 is the lower left corner, rows are along x and columns along y
+
+        frame = self.get_frame() #prendre image qu'on veut camera ou image
 
         # Étape 1: Convertir l'image en niveaux de gris
         gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -136,22 +150,22 @@ class VisionSystem:
         _, binary_frame = cv2.threshold(blurred_frame, 0, 1, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
 
         return binary_frame
+        '''
+        cap = cv2.VideoCapture(0)
+        ret, frame = cap.read()
 
-    cap = cv2.VideoCapture(0)
-    ret, frame = cap.read()
+        if ret:
+            binary_matrix = frame_to_binary_matrix(frame)
+            print(binary_matrix)  # Afficher la matrice binaire composée de 0 et 1
+    
+            # Afficher l'image binaire pour vérifier le résultat
+            cv2.imshow('Binary Frame', binary_matrix * 255)
+            cv2.waitKey(0)
+    
+        cap.release()
+        cv2.destroyAllWindows()
 
-    if ret:
-        binary_matrix = frame_to_binary_matrix(frame)
-        print(binary_matrix)  # Afficher la matrice binaire composée de 0 et 1
-
-        # Afficher l'image binaire pour vérifier le résultat
-        cv2.imshow('Binary Frame', binary_matrix * 255)
-        cv2.waitKey(0)
-
-    cap.release()
-    cv2.destroyAllWindows()
-
-    '''
+    
         matrix = []
         for i in range(120):  # Set grid dimensions as required
             row = []
@@ -182,7 +196,17 @@ def visionmain():
     cv2.imwrite('result\captured_frame.png', frame)  # Save to file result
 
 
-
 if __name__ == "__main__":
-    visionmain()
-    display_first_five_aruco_markers()
+    #visionmain()
+    #display_first_five_aruco_markers()
+    visionsystem = VisionSystem()
+    occupancyGrid=visionsystem.generate_occupancy_grid()
+    goal = visionsystem.get_goal_position()# slightly different than the default camera one
+    robot = visionsystem.get_robot_position()  # slightly different than the default camera one
+    robotSpeedFromEncoder = np.array([0, 0, 0]) #no speed
+    waypoints = [
+        np.array([100, 150, np.pi / 6]),  # x=100mm, y=150mm, direction=30° (π/6 radians)
+        np.array([200, 250, np.pi / 3]),  # x=200mm, y=250mm, direction=60° (π/3 radians)
+        np.array([300, 350, np.pi / 2])  # x=300mm, y=350mm, direction=90° (π/2 radians)
+    ]
+    plot_robot_grid(occupancyGrid, 10, robot, robot, robot, goal, waypoints)
