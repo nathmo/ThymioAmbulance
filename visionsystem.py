@@ -15,7 +15,7 @@ class VisionSystem:
         # Longueur du côté du marqueur en mètres
         self.marker_length = 0.05
 
-        self.use_camera = use_camera  # Booléen true si on utilise camera, false si on veut utiliser image
+        self.use_camera = 0  # Booléen true si on utilise camera, false si on veut utiliser image
         self.image_path = "testData\Image_iphone_path.png" # Chemin de l'image si use_camera est False
 
         return None# Initialize camera and other parameters
@@ -46,13 +46,13 @@ class VisionSystem:
     def get_frame(self):
         #Function qui determine si on prend camera ou frame imposé
         if self.use_camera:
-            print("Utilisation de la caméra...")
+            print("Utilisation de la caméra")
             frame = self.capture_frame()
             if frame is None:
                 print("Erreur lors de la capture de la frame depuis la caméra.")
             return frame
         else:
-            print(f"Chargement de l'image depuis {self.image_path}...")
+            print(f"Chargement de l'image depuis {self.image_path}")
             frame = cv2.imread(self.image_path)
             if frame is None:
                 print(f"Erreur : Impossible de charger l'image depuis {self.image_path}.")
@@ -65,7 +65,7 @@ class VisionSystem:
 
         frame = self.get_frame() #prendre image qu'on veut camera ou image
         corners, ids, _ = cv2.aruco.detectMarkers(frame, self.aruco_dict, parameters=self.parameters)
-
+        print(ids)
         if ids is not None:
             rvecs, tvecs, _ = cv2.aruco.estimatePoseSingleMarkers(corners, self.marker_length, self.camera_matrix,
                                                                   self.dist_coeffs)
@@ -203,6 +203,8 @@ if __name__ == "__main__":
     occupancyGrid=visionsystem.generate_occupancy_grid()
     goal = visionsystem.get_goal_position()# slightly different than the default camera one
     robot = visionsystem.get_robot_position()  # slightly different than the default camera one
+    print(robot)
+    print(goal)
     robotSpeedFromEncoder = np.array([0, 0, 0]) #no speed
     waypoints = [
         np.array([100, 150, np.pi / 6]),  # x=100mm, y=150mm, direction=30° (π/6 radians)
