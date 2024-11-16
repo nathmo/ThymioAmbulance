@@ -7,15 +7,15 @@ import matplotlib.pyplot as plt
 from helper import *
 
 class PathPlanner:
-    def __init__(self, pixel_size_mm=4, n=5):
+    def __init__(self, pixel_size_mm=4):
         """
         Initialize PathPlanner with the size of each pixel in millimeters and the minimum radius for random point placement.
         :param pixel_size_mm: Size of each pixel in millimeters.
         :param n: Minimum distance (in pixels) between points and obstacles.
         """
         self.pixel_size_mm = pixel_size_mm
-        self.pointRadius = 20  # minimum distance from other points and obstacles(~80mm)
-        self.lineRadius = 12  # minimum distance from other points and obstacles(~55mm)
+        self.pointRadius = 80/self.pixel_size_mm  # minimum distance from other points and obstacles(~80mm)
+        self.lineRadius = 55/self.pixel_size_mm  # minimum distance from other points and obstacles(~55mm)
 
     def is_valid_point(self, point, grid, placed_points):
         """
