@@ -1,8 +1,7 @@
-#opencv-python-headless #add here the library you need, one per line
+#add here the library you need, one per line
 opencv-contrib-python-headless
-#opencv-python
-#opencv-contrib-python
 numpy
-PIL
 matplotlib
 filterpy
+scikit-image
+shapely

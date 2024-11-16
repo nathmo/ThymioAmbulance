@@ -2,6 +2,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import time
+import os
 
 def import_matrix_from_txt(filename):
     """
@@ -24,6 +25,7 @@ def plot_robot_grid(occupancyGrid, gridSquareSizeMM, robotPosFromEncoder, robotP
     grid_size = gridSquareSizeMM  # each cell is 10mm
     height, width = occupancyGrid.shape
     ax.imshow(occupancyGrid, cmap='gray', origin='lower', extent=[0, width * grid_size, 0, height * grid_size])
+    # Obstacle (value set to true) are in white
 
     # Plot robot and goal positions with their orientations
     def plot_position_with_orientation(position, color, label):
@@ -50,5 +52,5 @@ def plot_robot_grid(occupancyGrid, gridSquareSizeMM, robotPosFromEncoder, robotP
     ax.set_title("Occupancy Grid and Robot Positions")
     ax.legend(loc='upper right')
 
-    plt.savefig("result\\"+str(int(time.time()))+".png")
+    plt.savefig(os.path.join("result", str(int(time.time()))+".png"))
     plt.show()
