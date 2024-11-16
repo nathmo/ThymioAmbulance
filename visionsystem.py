@@ -3,7 +3,7 @@ import cv2
 from helper import *
 
 class VisionSystem:
-    def __init__(self):
+    def __init__(self, use_camera=False, image_path="testData\Image_iphone_path.png", checker_board_length=175):
         # Charger le dictionnaire de marqueurs (DICT_6X6_250 contient 250 marqueurs uniques)
         self.aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_6X6_250)
         self.parameters = cv2.aruco.DetectorParameters()
@@ -13,12 +13,26 @@ class VisionSystem:
         self.dist_coeffs = np.array([0, 0, 0, 0], dtype=float)
 
         # Longueur du côté du marqueur en mètres
-        self.marker_length = 0.05
+        self.pixel_side_dimmension_mm = 1 # [mm]
+        self.checker_board_length = checker_board_length # [mm]
 
-        self.use_camera = 0  # Booléen true si on utilise camera, false si on veut utiliser image
-        self.image_path = "testData\Image_iphone_path.png" # Chemin de l'image si use_camera est False
+        self.use_camera = use_camera  # Booléen true si on utilise camera, false si on veut utiliser une image statique
+        self.image_path = image_path # Chemin de l'image si use_camera est False
 
-        return None# Initialize camera and other parameters
+        self.aruco_robot_id = 5
+        self.aruco_target_id = 4
+        #Function qui determine si on prend camera ou frame choisi
+        if self.use_camera:
+            print("Utilisation de la caméra")
+        else:
+            print(f"Chargement de l'image depuis {self.image_path}")
+
+        # will calibrate the camera by finding the checkboard pattern. can be called
+        # later if the calibration failed.
+        self.calibrate_camera_with_checkerboard()
+
+
+        return None
 
     def is_camera_ready(self):
         # Check if the camera is ready (returns True or False)
@@ -46,89 +60,202 @@ class VisionSystem:
     def get_frame(self):
         #Function qui determine si on prend camera ou frame choisi
         if self.use_camera:
-            print("Utilisation de la caméra")
             frame = self.capture_frame()
             if frame is None:
                 print("Erreur lors de la capture de la frame depuis la caméra.")
             return frame
         else:
-            print(f"Chargement de l'image depuis {self.image_path}")
             frame = cv2.imread(self.image_path)
             if frame is None:
                 print(f"Erreur : Impossible de charger l'image depuis {self.image_path}.")
             return frame
+    def get_pixel_side_mm(self):
+        return self.pixel_side_dimmension_mm
+
+    def calibrate_camera_with_checkerboard(self):
+        """
+        Calibrates the camera using an 8x8 checkerboard pattern and computes the size of a pixel in millimeters.
+        Updates self.camera_matrix and self.dist_coeffs.
+
+        Returns:
+            None
+        """
+        # Capture the frame
+        frame = self.get_frame()
+
+        # Checkerboard dimensions (inner corners: one less than the squares in each row/col)
+        checkerboard_dims = (7, 7)  # 8x8 checkerboard has 7x7 inner corners
+
+        # Prepare object points (3D points in real-world space)
+        square_size = self.checker_board_length / 8  # Size of one square in millimeters
+        objp = np.zeros((checkerboard_dims[0] * checkerboard_dims[1], 3), np.float32)
+        objp[:, :2] = np.mgrid[0:checkerboard_dims[0], 0:checkerboard_dims[1]].T.reshape(-1, 2)
+        objp *= square_size  # Scale according to real-world square size
+
+        # Find the checkerboard corners in the image
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        ret, corners = cv2.findChessboardCorners(gray, checkerboard_dims, None)
+
+        if ret:  # If corners are found
+            print("Checkerboard detected. Performing camera calibration...")
+
+            # Refine corner positions for better accuracy
+            corners_refined = cv2.cornerSubPix(
+                gray,
+                corners,
+                winSize=(11, 11),
+                zeroZone=(-1, -1),
+                criteria=(cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
+            )
+
+            # Perform camera calibration
+            ret, camera_matrix, dist_coeffs, rvecs, tvecs = cv2.calibrateCamera(
+                [objp],  # Object points
+                [corners_refined],  # Image points
+                gray.shape[::-1],  # Image size (width, height)
+                None,  # Initial camera matrix
+                None  # Initial distortion coefficients
+            )
+
+            if ret:  # If calibration is successful
+                # Update the object's camera matrix and distortion coefficients
+                self.camera_matrix = camera_matrix
+                self.dist_coeffs = np.array([0, 0, 0, 0], dtype=float)  # As per request
+
+                # Compute pixel size by directly measuring the checkerboard's sides
+                top_left = corners_refined[0][0]  # Top-left corner
+                top_right = corners_refined[6][0]  # Top-right corner
+                bottom_left = corners_refined[42][0]  # Bottom-left corner
+                bottom_right = corners_refined[48][0]  # Bottom-right corner
+
+                # Measure the horizontal and vertical pixel distances
+                horizontal_pixel_distance = np.linalg.norm(top_right - top_left)
+                vertical_pixel_distance = np.linalg.norm(bottom_left - top_left)
+
+                # Compute pixel size in millimeters
+                pixel_size_mm_horizontal = self.checker_board_length / horizontal_pixel_distance
+                pixel_size_mm_vertical = self.checker_board_length / vertical_pixel_distance
+
+                # Average pixel size
+                self.pixel_side_dimmension_mm = (pixel_size_mm_horizontal + pixel_size_mm_vertical) / 2
+
+                print(f"Calibration successful.")
+                print(f"Horizontal pixel size: {pixel_size_mm_horizontal} mm")
+                print(f"Vertical pixel size: {pixel_size_mm_vertical} mm")
+                print(f"Averaged pixel size: {self.pixel_side_dimmension_mm} mm")
+            else:
+                print("Calibration failed.")
+        else:
+            print("Checkerboard not detected in the frame.")
+
+        return None
 
     def get_robot_position(self):
-        # Use OpenCV to detect robot’s position and orientation
-        # Example position and orientation
-        # return np.array([100, 150, np.pi / 6])  # x=100mm, y=150mm, direction=30° (π/6 radians)
+        """
+        Detect ArUco markers, compute the robot's position and orientation,
+        and calculate the angle between the x-axis and the marker.
+        """
+        # Capture the frame from the camera or any source
+        frame = self.get_frame()
 
-        frame = self.get_frame() #prendre image qu'on veut camera ou image
+        # Detect ArUco markers in the frame
         corners, ids, _ = cv2.aruco.detectMarkers(frame, self.aruco_dict, parameters=self.parameters)
 
+        # If markers are detected, proceed
         if ids is not None:
-            rvecs, tvecs, _ = cv2.aruco.estimatePoseSingleMarkers(corners, self.marker_length, self.camera_matrix,
-                                                                  self.dist_coeffs)
+            # List to store marker centers and their respective IDs
+            marker_centers = []
 
-            robot_position = None
+            for i, corner in enumerate(corners):
+                # Compute the pixel position of the marker's center
+                center_x = int((corner[0][0][0] + corner[0][2][0]) / 2)
+                center_y = int((corner[0][0][1] + corner[0][2][1]) / 2)
+                marker_centers.append((ids[i][0], center_x, center_y))
 
-            for i, marker_id in enumerate(ids.flatten()):
-                if marker_id == 4:
-                    #print(ids)
-                    x, y = tvecs[i][0][:2] * 1000 # [:2] nous permet de prendre que x et y sans z
+            # Find marker ID 5 (robot marker)
+            marker_robot = next((m for m in marker_centers if m[0] == self.aruco_robot_id), None)
 
-                    rotation_matrix, _ = cv2.Rodrigues(rvecs[i][0])
-                    orientation = np.arctan2(rotation_matrix[1, 0],rotation_matrix[0, 0])  #Angle en radians XY
+            if marker_robot:
+                # Get the corners of marker ID 5 to compute orientation
+                idx = list(ids.flatten()).index(5)  # Index of marker ID 5
+                corners_robot = corners[idx][0]  # Extract corners of marker ID 5
 
-                    robot_position = np.array([x, y, orientation])
+                # Define two adjacent corners for angle calculation
+                corner1 = corners_robot[0]  # Top-left corner
+                corner2 = corners_robot[1]  # Top-right corner
 
-            if robot_position is not None:
-                print("Position Robot :")
-                return robot_position
+                # Compute vector along the marker's x-axis in pixel space
+                vector_x = corner2 - corner1  # Vector from corner1 to corner2
+                angle_radians = np.arctan2(vector_x[1], vector_x[0])  # Angle with x-axis
+
+                # Ensure clockwise convention: invert y-axis (screen coordinates)
+                angle_radians = -angle_radians
+
+                # Convert the robot's pixel position to mm
+                position_x_mm = float(marker_robot[1]) * self.pixel_side_dimmension_mm
+                position_y_mm = float(marker_robot[2]) * self.pixel_side_dimmension_mm
+
+                return np.array([position_x_mm, position_y_mm, angle_radians])
             else:
-                print("Marqueur du robot non détecté.")
-                return None
+                print("Marker ID for robot not found in the frame.")
         else:
-            print("Aucun marqueur Robot détecté.")
-            return None
+            print("No ArUco markers detected.")
+        # Returning an example value as placeholder
+        return None
 
 
     def get_goal_position(self):
         # Detect and return the goal position
         # The positioning is absolute and explained in generate_occupancy_grid
         # return np.array([100, 150, np.pi / 6])  # x=100mm, y=150mm, direction=30° (π/6 radians)
-        print("Bienvenu goal")
-        frame = self.get_frame() #prendre image qu'on veut camera ou image
+
+        # Capture the frame from the camera or any source
+        frame = self.get_frame()
+
+        # Detect ArUco markers in the frame
         corners, ids, _ = cv2.aruco.detectMarkers(frame, self.aruco_dict, parameters=self.parameters)
 
+        # If markers are detected, proceed
         if ids is not None:
-            ids = ids.flatten()
+            # List to store marker centers and their respective IDs
+            marker_centers = []
 
-            # Vérification de la présence des marqueurs nécessaires (0, 1, 2, 3 pour les coins et 5 pour l'objectif)
-            required_markers = {0, 1, 2, 3, 5}
-            detected_markers = set(ids)
+            for i, corner in enumerate(corners):
+                # Compute the pixel position of the marker's center
+                center_x = int((corner[0][0][0] + corner[0][2][0]) / 2)
+                center_y = int((corner[0][0][1] + corner[0][2][1]) / 2)
+                marker_centers.append((ids[i][0], center_x, center_y))
 
-            if not required_markers.issubset(detected_markers):
-                print("Tous les marqueurs dans goal nécessaires ne sont pas détectés.")
-                return None
+            # Find marker ID 5 (robot marker)
+            marker = next((m for m in marker_centers if m[0] == self.aruco_target_id), None)
 
-            rvecs, tvecs, _ = cv2.aruco.estimatePoseSingleMarkers(corners, self.marker_length, self.camera_matrix,
-                                                                  self.dist_coeffs)
+            if marker:
+                # Get the corners of marker ID 5 to compute orientation
+                idx = list(ids.flatten()).index(5)  # Index of marker ID 5
+                corners_robot = corners[idx][0]  # Extract corners of marker ID 5
 
-            #Position de l'objectif (marqueur 5)
-            for i, marker_id in enumerate(ids):
-                print("je suis rentrer dans boucle goal")
-                print(i)
-                if marker_id == 5:
-                    print("au fond fond")
-                    print(f"Marker ID {i}: {marker_id}")
-                    x, y = tvecs[i][0][:2] * 1000  # [:2] permet de prendre uniquement x et y sans z
-                    orientation = 0  # Utilisation d'une valeur fixe pour l'orientation
-                    return np.array([x, y, orientation])
+                # Define two adjacent corners for angle calculation
+                corner1 = corners_robot[0]  # Top-left corner
+                corner2 = corners_robot[1]  # Top-right corner
 
+                # Compute vector along the marker's x-axis in pixel space
+                vector_x = corner2 - corner1  # Vector from corner1 to corner2
+                angle_radians = np.arctan2(vector_x[1], vector_x[0])  # Angle with x-axis
+
+                # Ensure clockwise convention: invert y-axis (screen coordinates)
+                angle_radians = -angle_radians
+
+                # Convert the robot's pixel position to mm
+                position_x_mm = float(marker[1]) * self.pixel_side_dimmension_mm
+                position_y_mm = float(marker[2]) * self.pixel_side_dimmension_mm
+
+                return np.array([position_x_mm, position_y_mm, angle_radians])
+            else:
+                print("Marker ID for goal not found in the frame.")
         else:
-            print("Aucun marqueur goal détecté.")
-            return None
+            print("No ArUco markers detected.")
+        # Returning an example value as placeholder
+        return None
 
 
     def generate_occupancy_grid(self):
@@ -148,31 +275,6 @@ class VisionSystem:
         _, binary_frame = cv2.threshold(blurred_frame, 0, 1, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
 
         return binary_frame
-        '''
-        cap = cv2.VideoCapture(0)
-        ret, frame = cap.read()
-
-        if ret:
-            binary_matrix = frame_to_binary_matrix(frame)
-            print(binary_matrix)  # Afficher la matrice binaire composée de 0 et 1
-    
-            # Afficher l'image binaire pour vérifier le résultat
-            cv2.imshow('Binary Frame', binary_matrix * 255)
-            cv2.waitKey(0)
-    
-        cap.release()
-        cv2.destroyAllWindows()
-
-    
-        matrix = []
-        for i in range(120):  # Set grid dimensions as required
-            row = []
-            for j in range(150):
-                row.append(True if np.random.rand() > 0.5 else False)
-            matrix.append(row)
-
-        return np.array(matrix)  # Convert the list of lists into a NumPy array
-    '''
 
 def display_first_five_aruco_markers():
     aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_6X6_250)
@@ -184,22 +286,10 @@ def display_first_five_aruco_markers():
 
 
 
-def visionmain():
-
-    print("create vision object")
-    visionsystem = VisionSystem()
-    print("take a picture")
-    frame = visionsystem.capture_frame()
-    print("save picture")
-    cv2.imwrite('result\captured_frame.png', frame)  # Save to file result
-
-
 if __name__ == "__main__":
-    #visionmain()
-    #display_first_five_aruco_markers()
     visionsystem = VisionSystem()
     occupancyGrid = visionsystem.generate_occupancy_grid()
-    goal = visionsystem.get_goal_position()# slightly different than the default camera one
+    goal = visionsystem.get_goal_position() # slightly different than the default camera one
     robot = visionsystem.get_robot_position()  # slightly different than the default camera one
     print("position robot :")
     print(robot)
@@ -208,7 +298,5 @@ if __name__ == "__main__":
     robotSpeedFromEncoder = np.array([0, 0, 0]) #no speed
     waypoints = [
         np.array([100, 150, np.pi / 6]),  # x=100mm, y=150mm, direction=30° (π/6 radians)
-        np.array([200, 250, np.pi / 3]),  # x=200mm, y=250mm, direction=60° (π/3 radians)
-        np.array([300, 350, np.pi / 2])  # x=300mm, y=350mm, direction=90° (π/2 radians)
     ]
-    plot_robot_grid(occupancyGrid, 2.46, robot, robot, robot, goal, waypoints)
+    plot_robot_grid(occupancyGrid, visionsystem.get_pixel_side_mm(), robot, robot, robot, goal, waypoints)
