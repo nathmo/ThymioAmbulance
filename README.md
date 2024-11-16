@@ -1,12 +1,13 @@
 # ThymioAmbulance
-This repo contains code and documentation to control the thymio from a laptop and a camera to navigate a labyrinthe
+This repo contains code and documentation to control the thymio from a laptop using
+a ceiling mounted camera to navigate a labyrinthe
 
 # Lore
 pompier/ambulance -> thymio 
 - evite voiture sur la route
 - GPS (camera)
 - connais les route (obsctacle vu par la camera unlike voiture)
-va chercher le patient ASAP et reviens a l'hôpital
+va chercher le patient ASAP 
 
 position de marker avec une camera
 path finding(astar)
@@ -27,10 +28,11 @@ Fast loop :
 - follow track given by path planning
 
 Pathplanning :
-- use the matrix to computer the fastest route 
+- use the occupancy matrix to compute the fastest route 
 
 ComputerVision :
-- get the robot and goal position
+- get the image dimmension + calibrate the camera.
+- get the robot + goal position
 - get the occupancy map
 
 Robot :
@@ -38,6 +40,9 @@ deal with the hardware + realtime
 - give estimated position
 - allow the update of the estimated position
 - get a list of waypoint and follow them.
+
+sensorfusion :
+- merge the data from the camera + encoder to improve the accuracy.
 
 # Work package 1) -> Seif
 python class for robot movement.
@@ -100,7 +105,7 @@ This module will return the position and orientation of the robot + a NxM matrix
 
 ```
 class VisionSystem:
-    def __init__(self, camera):
+    def __init__(self):
         # Initialize camera and other parameters
 
     def is_camera_ready(self):
@@ -151,7 +156,7 @@ To demonstrate how your system work, use the visualisation helper tool (made by 
 # Work package 3) -> Paul-Antoine
 the goal is to compute the path planning using the current position + goal position and the matrix of occupancy and return a serie of waypoint for the robot to follow
 
-ensure that the bounding box of the robot do not colide when following the waypoint.
+ensure that the bounding box of the robot do not collide when following the waypoint.
 
 ```
 class PathPlanner:
@@ -170,7 +175,7 @@ class PathPlanner:
         return waypoints
 ```
 
-To demonstrate how your system work, use the a visualisation tool that render both the waypoint and the numpy array made by work package 4. try to pregen a few true/false map to see how your algorithm behave with edge case (no path exist, multiple path of same lenght exist, very short path, very large map and or Long path )
+To demonstrate how your system work, use the visualisation tool that render both the waypoint and the numpy array made by work package 4. try to pregen a few true/false map to see how your algorithm behave with edge case (no path exist, multiple path of same lenght exist, very short path, very large map and or Long path )
 
 
 # Work package 4) -> Nathann
