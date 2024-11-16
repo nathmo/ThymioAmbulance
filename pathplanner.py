@@ -150,22 +150,22 @@ class PathPlanner:
 
     def get_waypoints(self, occupancy_grid, start, target):
         """
-        Get waypoints by randomly placing points on the grid and applying A* to find the path.
+        Get waypoints by randomly placing points on the grid where there is no obstacle in a given radius not an other
+        point then apply A* to find the path.
         :param occupancy_grid: Occupancy grid (True for obstacles, False for free space).
         :param start: Start position (x, y, orientation).
         :param target: Target position (x, y, orientation).
         :return: List of waypoints.
         """
-        # Define some variables
+
         width, height = occupancy_grid.shape
         free_space = np.argwhere(occupancy_grid == 0)  # Find all free space pixels
         num_free_pixels = len(free_space)
+
         # Calculate the target number of points to place (5% of free space but cap to 1000)
-        target_num_points = min(int(0.05 * num_free_pixels),1000)
+        points_to_place = min(int(0.05 * num_free_pixels),1000)
 
         placed_points = []
-        points_to_place = target_num_points
-
         # Start and target positions (manually added)
         placed_points.append(tuple(start[:2]))
         placed_points.append(tuple(target[:2]))
@@ -176,16 +176,17 @@ class PathPlanner:
             # Randomly pick a point from free space
             timeout = timeout + 1
             if(timeout>points_to_place*2):
-                break
+                break # in case its not possible to place all the point dont block the system
             y, x = random.choice(free_space) # value are unpacked in the wrong order for some reason
             if self.is_valid_point((x, y), occupancy_grid, placed_points):
-                placed_points.append((x, y))
+                placed_points.append((x, y)) # if a point taken at random is in a valid place
+                # not too close to an obstacle nor another point.
         # Run A* to find the path from start to target through the placed points
         waypoints = self.a_star(occupancy_grid, start, target, placed_points)
-        retour = []
-        for p in placed_points:
-            retour.append((p[0],p[1], 0))
-        return self.compute_angles_for_waypoints(waypoints)
+        #retour = []  # to see the point placed at random on the map instead of the waypoints :
+        #for p in placed_points:
+        #    retour.append((p[0], p[1], 0))
+        return  self.compute_angles_for_waypoints(waypoints) # the angle are a bonus and simplify teh robot control.
 
     def a_star(self, grid, startpoint, goalpoint, available_nodes):
         """
