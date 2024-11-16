@@ -33,9 +33,11 @@ def main():
     update_thread.daemon = True  # Daemonize thread to exit when main program exits
     update_thread.start()
 
+    interval = 1  # 1000 ms interval (1 Hz)
     while True:
+        start_time = time.perf_counter()  # Record the start time
         '''
-        - get the Camera position of the map and robot and the target (car crash, ciff)
+        - get the Camera position of the map and robot and the target 
         - get the map layout (road line) (Camera)
         - get the position from the robot encoder
         - use sensorfusion to improve robot position
@@ -43,30 +45,33 @@ def main():
         - use path planning to find best way (A*)
         - update robot movement instruction
         '''
-        if(vision.is_camera_ready()):
-            robotPosFromCamera = vision.get_robot_position()
-            goalPosFromCamera = vision.get_goal_position()
-            occupancyGrid = vision.generate_occupancy_grid()
-            robotPosFromEncoder = robot.get_position()
-            robotSpeedFromEncoder = robot.get_speed()
-            robotPosFromFusion = sensorfusion.get_estimated_position(robotPosFromEncoder, robotSpeedFromEncoder, robotPosFromCamera)
-            waypoints = PathPlanner.get_waypoints(occupancyGrid, robotPosFromFusion, goalPosFromCamera)
-            robot.set_position(robotPosFromFusion)
-            robot.set_waypoints(waypoints)
-            print("Main ran and have the following intermediate value : ")
-            print("waypoints : " + str(waypoints))
-            print("number of waypoints : " + str(len(waypoints)))
-            print("robotPosFromCamera : "+str(robotPosFromCamera))
-            print(" + robotPosFromEncoder : " + str(robotPosFromEncoder))
-            print(" = robotPosFromFusion : " + str(robotPosFromFusion))
-            print("robotSpeedFromEncoder : " + str(robotSpeedFromEncoder))
-            print("goalPosFromCamera : " + str(goalPosFromCamera))
-            print("---------------------------------------------------------")
-        else:
-            print("camera Not Ready")
 
+        # add a line to set pixel scale to the path finder
+        robotPosFromCamera = vision.get_robot_position()
+        goalPosFromCamera = vision.get_goal_position()
+        occupancyGrid = vision.generate_occupancy_grid()
+        robotPosFromEncoder = robot.get_position()
+        robotSpeedFromEncoder = robot.get_speed()
+        robotPosFromFusion = sensorfusion.get_estimated_position(robotPosFromEncoder, robotSpeedFromEncoder, robotPosFromCamera)
+        waypoints = PathPlanner.get_waypoints(occupancyGrid, robotPosFromFusion, goalPosFromCamera)
+        robot.set_position(robotPosFromFusion)
+        robot.set_waypoints(waypoints)
+        print("Main ran and have the following intermediate value : ")
+        print("waypoints : " + str(waypoints))
+        print("number of waypoints : " + str(len(waypoints)))
+        print("robotPosFromCamera : "+str(robotPosFromCamera))
+        print(" + robotPosFromEncoder : " + str(robotPosFromEncoder))
+        print(" = robotPosFromFusion : " + str(robotPosFromFusion))
+        print("robotSpeedFromEncoder : " + str(robotSpeedFromEncoder))
+        print("goalPosFromCamera : " + str(goalPosFromCamera))
+        print("---------------------------------------------------------")
 
-        time.sleep(1)  # Adjust the main loop's frequency as needed
+        # Calculate the elapsed time and sleep for the remainder of the interval
+        elapsed_time = time.perf_counter() - start_time
+        sleep_time = max(0, interval - elapsed_time)  # Ensure non-negative sleep time
+        if (sleep_time == 0):
+            print("slow loop cant keep up. please lower frequency or optimize better")
+        time.sleep(sleep_time)
 
 if __name__ == "__main__":
     main()

@@ -65,7 +65,7 @@ class VisionSystem:
 
         frame = self.get_frame() #prendre image qu'on veut camera ou image
         corners, ids, _ = cv2.aruco.detectMarkers(frame, self.aruco_dict, parameters=self.parameters)
-        print(ids)
+
         if ids is not None:
             rvecs, tvecs, _ = cv2.aruco.estimatePoseSingleMarkers(corners, self.marker_length, self.camera_matrix,
                                                                   self.dist_coeffs)
@@ -73,16 +73,17 @@ class VisionSystem:
             robot_position = None
 
             for i, marker_id in enumerate(ids.flatten()):
-                if marker_id == 5: #check si on a bien 4 marqueurs
-                    x, y = tvecs[i][0][:2] * 1000 #[:2] nous permet de prendre que x et y sans z
+                if marker_id == 4:
+                    #print(ids)
+                    x, y = tvecs[i][0][:2] * 1000 # [:2] nous permet de prendre que x et y sans z
 
                     rotation_matrix, _ = cv2.Rodrigues(rvecs[i][0])
                     orientation = np.arctan2(rotation_matrix[1, 0],rotation_matrix[0, 0])  #Angle en radians XY
 
-                    # Stocker la position et l'orientation du robot
                     robot_position = np.array([x, y, orientation])
 
             if robot_position is not None:
+                print("Position Robot :")
                 return robot_position
             else:
                 print("Marqueur du robot non détecté.")
@@ -96,7 +97,7 @@ class VisionSystem:
         # Detect and return the goal position
         # The positioning is absolute and explained in generate_occupancy_grid
         # return np.array([100, 150, np.pi / 6])  # x=100mm, y=150mm, direction=30° (π/6 radians)
-
+        print("Bienvenu goal")
         frame = self.get_frame() #prendre image qu'on veut camera ou image
         corners, ids, _ = cv2.aruco.detectMarkers(frame, self.aruco_dict, parameters=self.parameters)
 
@@ -109,7 +110,6 @@ class VisionSystem:
 
             if not required_markers.issubset(detected_markers):
                 print("Tous les marqueurs dans goal nécessaires ne sont pas détectés.")
-                print()
                 return None
 
             rvecs, tvecs, _ = cv2.aruco.estimatePoseSingleMarkers(corners, self.marker_length, self.camera_matrix,
@@ -117,7 +117,11 @@ class VisionSystem:
 
             #Position de l'objectif (marqueur 5)
             for i, marker_id in enumerate(ids):
+                print("je suis rentrer dans boucle goal")
+                print(i)
                 if marker_id == 5:
+                    print("au fond fond")
+                    print(f"Marker ID {i}: {marker_id}")
                     x, y = tvecs[i][0][:2] * 1000  # [:2] permet de prendre uniquement x et y sans z
                     orientation = 0  # Utilisation d'une valeur fixe pour l'orientation
                     return np.array([x, y, orientation])
@@ -194,10 +198,12 @@ if __name__ == "__main__":
     #visionmain()
     #display_first_five_aruco_markers()
     visionsystem = VisionSystem()
-    occupancyGrid=visionsystem.generate_occupancy_grid()
+    occupancyGrid = visionsystem.generate_occupancy_grid()
     goal = visionsystem.get_goal_position()# slightly different than the default camera one
     robot = visionsystem.get_robot_position()  # slightly different than the default camera one
+    print("position robot :")
     print(robot)
+    print("position goal :")
     print(goal)
     robotSpeedFromEncoder = np.array([0, 0, 0]) #no speed
     waypoints = [
@@ -205,4 +211,4 @@ if __name__ == "__main__":
         np.array([200, 250, np.pi / 3]),  # x=200mm, y=250mm, direction=60° (π/3 radians)
         np.array([300, 350, np.pi / 2])  # x=300mm, y=350mm, direction=90° (π/2 radians)
     ]
-    plot_robot_grid(occupancyGrid, 10, robot, robot, robot, goal, waypoints)
+    plot_robot_grid(occupancyGrid, 2.46, robot, robot, robot, goal, waypoints)
