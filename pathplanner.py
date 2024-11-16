@@ -14,8 +14,8 @@ class PathPlanner:
         :param n: Minimum distance (in pixels) between points and obstacles.
         """
         self.pixel_size_mm = pixel_size_mm
-        self.pointRadius = 80/self.pixel_size_mm  # minimum distance from other points and obstacles(~80mm)
-        self.lineRadius = 55/self.pixel_size_mm  # minimum distance from other points and obstacles(~55mm)
+        self.pointRadius = int(80/self.pixel_size_mm)  # minimum distance from other points and obstacles(~80mm)
+        self.lineRadius = int(55/self.pixel_size_mm)  # minimum distance from other points and obstacles(~55mm)
 
     def is_valid_point(self, point, grid, placed_points):
         """
@@ -113,6 +113,37 @@ class PathPlanner:
         # Check if any value in the region is True
         return np.any(region)
 
+    def compute_angles_for_waypoints(self, waypoints):
+        """
+        Computes the angle (theta) between consecutive waypoints and updates the last value of each waypoint with the computed theta.
+        The angle is defined as the clockwise rotation from the positive x-axis.
+
+        :param waypoints: List of numpy arrays where each array is of the form [x, y, theta].
+        :return: List of updated waypoints with computed theta values.
+        """
+        updated_waypoints = []
+
+        for i in range(len(waypoints) - 1):
+            # Current and next waypoints
+            current = waypoints[i]
+            next_wp = waypoints[i + 1]
+
+            # Compute the delta x and delta y
+            delta_x = next_wp[0] - current[0]
+            delta_y = next_wp[1] - current[1]
+
+            # Compute the angle (theta) using arctan2, adjusting to clockwise from x-axis
+            theta = np.arctan2(-delta_y, delta_x)
+
+            # Update the current waypoint with the computed angle
+            updated_waypoints.append(np.array([current[0], current[1], theta]))
+
+        # Append the last waypoint with the same theta as the second-to-last one
+        last_theta = updated_waypoints[-1][2] if updated_waypoints else 0
+        updated_waypoints.append(np.array([waypoints[-1][0], waypoints[-1][1], last_theta]))
+
+        return updated_waypoints
+
     def get_waypoints(self, occupancy_grid, start, target):
         """
         Get waypoints by randomly placing points on the grid and applying A* to find the path.
@@ -125,7 +156,7 @@ class PathPlanner:
         width, height = occupancy_grid.shape
         free_space = np.argwhere(occupancy_grid == 0)  # Find all free space pixels
         num_free_pixels = len(free_space)
-        # Calculate the target number of points to place (5% of free space)
+        # Calculate the target number of points to place (5% of free space but cap to 1000)
         target_num_points = min(int(0.05 * num_free_pixels),1000)
 
         placed_points = []
@@ -142,15 +173,15 @@ class PathPlanner:
             timeout = timeout + 1
             if(timeout>points_to_place*2):
                 break
-            x, y = random.choice(free_space)
-            if self.is_valid_point((y, x), occupancy_grid, placed_points):
-                placed_points.append((y, x))
+            y, x = random.choice(free_space) # value are unpacked in the wrong order for some reason
+            if self.is_valid_point((x, y), occupancy_grid, placed_points):
+                placed_points.append((x, y))
         # Run A* to find the path from start to target through the placed points
         waypoints = self.a_star(occupancy_grid, start, target, placed_points)
         retour = []
         for p in placed_points:
             retour.append((p[0],p[1], 0))
-        return waypoints
+        return self.compute_angles_for_waypoints(waypoints)
 
     def a_star(self, grid, startpoint, goalpoint, available_nodes):
         """
