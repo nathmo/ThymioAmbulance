@@ -28,6 +28,7 @@ def main():
     robot = RobotMovement()
     vision = VisionSystem()
     sensorfusion = SensorFusion()
+    pathplanner = PathPlanner(pixel_size_mm=vision.get_pixel_side_mm())
     # Start a separate thread for the update loop
     update_thread = threading.Thread(target=update_loop, args=(robot,))
     update_thread.daemon = True  # Daemonize thread to exit when main program exits
@@ -53,7 +54,7 @@ def main():
         robotPosFromEncoder = robot.get_position()
         robotSpeedFromEncoder = robot.get_speed()
         robotPosFromFusion = sensorfusion.get_estimated_position(robotPosFromEncoder, robotSpeedFromEncoder, robotPosFromCamera)
-        waypoints = PathPlanner.get_waypoints(occupancyGrid, robotPosFromFusion, goalPosFromCamera)
+        waypoints = pathplanner.get_waypoints(occupancyGrid, robotPosFromFusion, goalPosFromCamera)
         robot.set_position(robotPosFromFusion)
         robot.set_waypoints(waypoints)
         print("Main ran and have the following intermediate value : ")
