@@ -44,7 +44,7 @@ class VisionSystem:
             return None
 
     def get_frame(self):
-        #Function qui determine si on prend camera ou frame imposé
+        #Function qui determine si on prend camera ou frame choisi
         if self.use_camera:
             print("Utilisation de la caméra")
             frame = self.capture_frame()
@@ -76,14 +76,12 @@ class VisionSystem:
                 if marker_id == 5: #check si on a bien 4 marqueurs
                     x, y = tvecs[i][0][:2] * 1000 #[:2] nous permet de prendre que x et y sans z
 
-                    # Utilisation d'une approche simplifiée pour l'orientation
                     rotation_matrix, _ = cv2.Rodrigues(rvecs[i][0])
                     orientation = np.arctan2(rotation_matrix[1, 0],rotation_matrix[0, 0])  #Angle en radians XY
 
                     # Stocker la position et l'orientation du robot
                     robot_position = np.array([x, y, orientation])
 
-            # Retourner la position et l'orientation du robot s'il est détecté
             if robot_position is not None:
                 return robot_position
             else:
@@ -117,7 +115,7 @@ class VisionSystem:
             rvecs, tvecs, _ = cv2.aruco.estimatePoseSingleMarkers(corners, self.marker_length, self.camera_matrix,
                                                                   self.dist_coeffs)
 
-            # Détermination de la position de l'objectif (marqueur 5)
+            #Position de l'objectif (marqueur 5)
             for i, marker_id in enumerate(ids):
                 if marker_id == 5:
                     x, y = tvecs[i][0][:2] * 1000  # [:2] permet de prendre uniquement x et y sans z
@@ -127,8 +125,6 @@ class VisionSystem:
         else:
             print("Aucun marqueur goal détecté.")
             return None
-
-
 
 
     def generate_occupancy_grid(self):
@@ -141,12 +137,10 @@ class VisionSystem:
         # Étape 1: Convertir l'image en niveaux de gris
         gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
-        # Étape 2: Appliquer un filtre pour accentuer les objets (optionnel)
-        # Ici on applique un flou gaussien pour réduire le bruit
+        # Étape 2: Appliquer un filtre pour accentuer les objets, applique filtre pour réduire le bruit
         blurred_frame = cv2.GaussianBlur(gray_frame, (5, 5), 0)
 
-        # Étape 3: Appliquer un seuillage pour binariser l'image
-        # Utilisation de la méthode de seuillage Otsu pour déterminer automatiquement le seuil
+        # Étape 3: Appliquer un seuil (Otsu) pour binariser l'image
         _, binary_frame = cv2.threshold(blurred_frame, 0, 1, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
 
         return binary_frame
