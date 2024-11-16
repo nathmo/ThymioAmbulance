@@ -266,7 +266,7 @@ if __name__ == "__main__":
 
     # Define the goal and robot states
     goal = np.array([30, 30, np.pi / 6])  # slightly different than the default camera one
-    robot = np.array([460,400, np.pi / 6])  # slightly different than the default camera one
+    robot = np.array([40,400, np.pi / 6])  # slightly different than the default camera one
     print("Robot:", robot)
     print("Goal:", goal)
 
