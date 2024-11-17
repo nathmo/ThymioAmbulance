@@ -5,3 +5,4 @@ matplotlib
 filterpy
 scikit-image
 shapely
+tdmclient # also require to install ThymioSuite https://www.thymio.org/download-thymio-suite-redirect/
