@@ -320,8 +320,6 @@ class RobotMovement:
                 "motor.right.target": [self.mm_per_second_to_arbitrary_unit(speed)],
             }
             aw(self.node.set_variables(v))
-            robot_variables = self.node.v
-            print(robot_variables)
             aw(self.node.unlock())  # Release lock
         else:
             print("robot not connected")
@@ -360,6 +358,51 @@ class RobotMovement:
         else:
             print("robot not connected")
 
+    def get_proximity_ir_sensor(self):
+        """
+        return a dictionary with the following key :
+        the greater the value (0-4096) the closer the obstacle
+        """
+
+        if self.node is not None:
+            self.node.lock()
+            aw(self.client.wait_for_status(self.client.NODE_STATUS_READY))
+            self.client.aw(self.node.wait_for_variables())
+            sensor = self.node.v.prox.horizontal
+            sensorDict = {
+                "rear_right":sensor[6],
+                "rear_left": sensor[5],
+                "front_left": sensor[0],
+                "front_center_left": sensor[1],
+                "front_center": sensor[2],
+                "front_center_right": sensor[3],
+                "front_right": sensor[4],
+            }
+            self.node.unlock()
+            return sensorDict
+        else:
+            print("robot not connected")
+
+    def get_button_pressed(self):
+        """
+        return a dictionary with the following key :
+        the greater the value (0-4096) the closer the obstacle
+        """
+
+        if self.node is not None:
+            self.node.lock()
+            self.client.aw(self.node.wait_for_variables())
+            buttonDict = {
+                "backward":self.node.v.button.backward,
+                "left": self.node.v.button.left,
+                "center": self.node.v.button.center,
+                "forward": self.node.v.button.forward,
+                "right": self.node.v.button.right,
+            }
+            self.node.unlock()
+            return buttonDict
+        else:
+            print("robot not connected")
     def get_all_variable(self):
         if self.node is not None:
             self.node.lock()
@@ -372,6 +415,9 @@ class RobotMovement:
 
             # Retrieve each variable's value
             variable_values = {var: getattr(self.node.v, var) for var in variable_names}
+
+            for i in self.node.v.prox.horizontal:
+                print(i)
             self.node.unlock()
             return variable_values
         else:
@@ -381,13 +427,12 @@ class RobotMovement:
 if __name__ == "__main__":
     robot = RobotMovement()
     robot.connect()
-    print(robot.get_all_variable())
-    #robot.turn_angle(np.pi)
-    print("start set speed to 50")
-    robot.set_straight_speed(90)
-    print("done set speed to 10")
-    #robot.turn_angle(np.pi)
-    time.sleep(10)
-    print("start set speed to 0")
-    robot.set_straight_speed(0)
-    print("done set speed to 0")
+    robot.set_straight_speed(00)
+    while True:
+        print(robot.get_proximity_ir_sensor())
+        #print(robot.get_all_variable())
+        #print(robot.get_temperature())
+        print(robot.get_button_pressed())
+
+        time.sleep(2)
+
