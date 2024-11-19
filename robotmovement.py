@@ -24,6 +24,9 @@ class RobotMovement:
         with self._lock:
             self.waypoints = waypoints
 
+    def connect(self):
+        self.node = aw(self.client.wait_for_node())            
+
     def get_waypoints(self):
         # Return the global list of waypoints to follow minus those already reached
         # Requires mutex to ensure thread-safe access
