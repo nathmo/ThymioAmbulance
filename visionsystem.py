@@ -21,16 +21,16 @@ class VisionSystem:
 
         self.aruco_robot_id = 5
         self.aruco_target_id = 4
+
         #Function qui determine si on prend camera ou frame choisi
         if self.use_camera:
             print("Utilisation de la caméra")
         else:
             print(f"Chargement de l'image depuis {self.image_path}")
 
-        # will calibrate the camera by finding the checkboard pattern. can be called
-        # later if the calibration failed.
+        # Will calibrate the camera by finding the checkboard pattern. Can be called
+        # Later if the calibration failed.
         self.calibrate_camera_with_checkerboard()
-
 
         return None
 
@@ -69,6 +69,7 @@ class VisionSystem:
             if frame is None:
                 print(f"Erreur : Impossible de charger l'image depuis {self.image_path}.")
             return frame
+
     def get_pixel_side_mm(self):
         return self.pixel_side_dimmension_mm
 
@@ -158,7 +159,6 @@ class VisionSystem:
         # Capture the frame from the camera or any source
         frame = self.get_frame()
 
-        # Detect ArUco markers in the frame
         corners, ids, _ = cv2.aruco.detectMarkers(frame, self.aruco_dict, parameters=self.parameters)
 
         # If markers are detected, proceed
@@ -168,8 +168,8 @@ class VisionSystem:
 
             for i, corner in enumerate(corners):
                 # Compute the pixel position of the marker's center
-                center_x = int((corner[0][0][0] + corner[0][2][0]) / 2)
-                center_y = int((corner[0][0][1] + corner[0][2][1]) / 2)
+                center_x = int((corner[0][0][0] + corner[0][2][0]) / 2) #1er index choose which Aruco,
+                center_y = int((corner[0][0][1] + corner[0][2][1]) / 2) #2eme give which corner, 3eme tell us x or y
                 marker_centers.append((ids[i][0], center_x, center_y))
 
             # Find marker ID 5 (robot marker)
@@ -196,6 +196,7 @@ class VisionSystem:
                 position_y_mm = float(marker_robot[2]) * self.pixel_side_dimmension_mm
 
                 return np.array([position_x_mm, position_y_mm, angle_radians])
+
             else:
                 print("Marker ID for robot not found in the frame.")
         else:
@@ -212,7 +213,6 @@ class VisionSystem:
         # Capture the frame from the camera or any source
         frame = self.get_frame()
 
-        # Detect ArUco markers in the frame
         corners, ids, _ = cv2.aruco.detectMarkers(frame, self.aruco_dict, parameters=self.parameters)
 
         # If markers are detected, proceed
@@ -250,6 +250,7 @@ class VisionSystem:
                 position_y_mm = float(marker[2]) * self.pixel_side_dimmension_mm
 
                 return np.array([position_x_mm, position_y_mm, angle_radians])
+
             else:
                 print("Marker ID for goal not found in the frame.")
         else:
@@ -276,13 +277,13 @@ class VisionSystem:
 
         return binary_frame
 
-def display_first_five_aruco_markers():
-    aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_6X6_250)
+    def display_first_five_aruco_markers():
+        aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_6X6_250)
 
-    for i in range(6):  # Affiche les 5 premiers marqueurs de 0 à 5
-        marker_image = cv2.aruco.generateImageMarker(aruco_dict, i, 200)
+        for i in range(6):  # Affiche les 5 premiers marqueurs de 0 à 5
+            marker_image = cv2.aruco.generateImageMarker(aruco_dict, i, 200)
 
-        cv2.imwrite(f'Marqueur {i}.png', marker_image)
+            cv2.imwrite(f'Marqueur {i}.png', marker_image)
 
 
 
