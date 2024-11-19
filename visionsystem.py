@@ -81,7 +81,7 @@ class VisionSystem:
         Returns:
             None
         """
-        # Capture the frame
+
         frame = self.get_frame()
 
         # Checkerboard dimensions (inner corners: one less than the squares in each row/col)
@@ -156,7 +156,7 @@ class VisionSystem:
         Detect ArUco markers, compute the robot's position and orientation,
         and calculate the angle between the x-axis and the marker.
         """
-        # Capture the frame from the camera or any source
+
         frame = self.get_frame()
 
         corners, ids, _ = cv2.aruco.detectMarkers(frame, self.aruco_dict, parameters=self.parameters)
@@ -210,7 +210,6 @@ class VisionSystem:
         # The positioning is absolute and explained in generate_occupancy_grid
         # return np.array([100, 150, np.pi / 6])  # x=100mm, y=150mm, direction=30° (π/6 radians)
 
-        # Capture the frame from the camera or any source
         frame = self.get_frame()
 
         corners, ids, _ = cv2.aruco.detectMarkers(frame, self.aruco_dict, parameters=self.parameters)
@@ -264,7 +263,7 @@ class VisionSystem:
         # True means the space is occupied, False means it's free
         # Grid layout: 0,0 is the lower left corner, rows are along x and columns along y
 
-        frame = self.get_frame() #prendre image qu'on veut camera ou image
+        frame = self.get_frame()
 
         # Étape 1: Convertir l'image en niveaux de gris
         gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
