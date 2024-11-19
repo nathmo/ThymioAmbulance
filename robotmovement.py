@@ -1,6 +1,8 @@
 import numpy as np
 from threading import Lock
 import math
+from tdmclient import ClientAsync, aw, thymio
+import time
 
 # Constants
 BASICSPEED = 100
@@ -8,8 +10,10 @@ GAIN = 10
 ANGULAR_GAIN = 15
 
 class RobotMovement:
-    def _init_(self):
+    def __init__(self):
         # Initialize motors, sensors, and encoders
+        self.client = ClientAsync()
+        self.node = None
         self.waypoints = [np.array([0, 0, 0])]  # list of np.array for waypoints
         self.position = np.array([0, 0, 0])     # Current position of the robot
         self.speed = np.array([0, 0, 0])        # Current speed of the robot
@@ -44,7 +48,7 @@ class RobotMovement:
         # Update the robot’s position based on Kalman filter results
         # Requires mutex for thread-safe update
         with self._lock:
-            self.position = (self.position + kalman_position)/2
+            self.position = (kalman_position)
 
     def get_speed(self):
         # Return the robot's speed and angular speed from encoders
@@ -69,13 +73,20 @@ class RobotMovement:
 
             diff = heading_error * ANGULAR_GAIN
             motor_left_target = BASICSPEED - diff*GAIN
-            motor_right_target = BASICSPEED + diff*GAIN
+            motor_right_target = BASICSPEED + diff*GAIN   
 
             self.speed = np.array([motor_left_target, motor_right_target, heading_error])
+
+            aw(self.node.lock())  # Acquire lock explicitly
+            aw(self.client.wait_for_status(self.client.NODE_STATUS_READY))
+            v = {
+            "motor.left.target": [motor_left_target],
+            "motor.right.target": [motor_right_target],
+            }
+            aw(self.node.set_variables(v))
+            aw(self.node.unlock())  # Release lock
 
             if ((abs(self.waypoints[0] - self.position)) < 50):
                 self.waypoints.pop(0)
 
-            # Update the robot's position based on the Kalman Filter (Ask how to gain access to it)
-            # Obstacle Avoidance is taken into consideration in pathplanner.py, so it should be taken into consideration in
-            # the list of waypoints that are passed to the robot movement class
+            # Local AVOIDANCE   
