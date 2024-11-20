@@ -144,7 +144,7 @@ print(robot_variables)
 'button.right', 
 'buttons._mean', 
 'buttons._noise', 
-'prox.horizontal', 
+'prox.horizontal',     -> a list of 7 value from 0 (nothing dected) to 4096 (very close to obstacle), index 0 is front_left, then, front_center_left, front_center, front_center_right, front_right, rear_left, rear_right (index 6)
 'prox.comm.rx._payloads', 
 'prox.comm.rx._intensities', 
 'prox.comm.rx', 
