@@ -229,6 +229,9 @@ class RobotMovement:
         with self._lock:
             self.waypoints = waypoints
 
+    def connect(self):
+        self.node = aw(self.client.wait_for_node())            
+
     def get_waypoints(self):
         with self._lock:
             return self.waypoints
@@ -239,7 +242,7 @@ class RobotMovement:
 
     def set_position(self, kalman_position):
         with self._lock:
-            self.position = kalman_position
+            self.position = (kalman_position)
 
     def get_speed(self):
         with self._lock:
