@@ -224,13 +224,11 @@ class RobotMovement:
     def connect(self):
         self.node = aw(self.client.wait_for_node())
         aw(self.node.lock())
+        aw(self.client.wait_for_status(self.client.NODE_STATUS_READY))
 
     def set_waypoints(self, waypoints):
         with self._lock:
             self.waypoints = waypoints
-
-    def connect(self):
-        self.node = aw(self.client.wait_for_node())            
 
     def get_waypoints(self):
         with self._lock:
@@ -280,12 +278,16 @@ class RobotMovement:
                 distance = np.linalg.norm(distance_vector)
             else:
                 distance = -np.linalg.norm(distance_vector)
-            print("-------------------------------------------")
-            print("speed "+str(self.get_speed()))
-            print("position "+str(position))
-            print("target " + str(next_waypoint))
-            print("Distance to target : "+str(distance))
-            print("angle to target : " + str(angle_diff))
+
+            if not (int(self.update_count) % max(10, int(1/(min(1, average_elapsed_time))))) :
+                print("-------------------------------------------")
+                print("speed "+str(self.get_speed()))
+                print("position "+str(position))
+                print("target " + str(next_waypoint))
+                print("Distance to target : "+str(distance))
+                print("angle to target : " + str(angle_diff))
+                print("average elapsed time "+str(average_elapsed_time))
+                print("time since last print "+str(average_elapsed_time*self.update_count))
             # Normalize angle_diff to [-pi, pi]
             angle_diff = (angle_diff + np.pi) % (2 * np.pi) - np.pi
 
@@ -297,9 +299,10 @@ class RobotMovement:
             if abs(angle_diff) > 0.2:  # Angular adjustment
                 min_time = max(3 * average_elapsed_time, 1.0)  # Ensure min_time is at least 1 second
                 angular_speed = angle_diff / min_time
-                angular_speed = max(0.5, abs(angular_speed))  # Ensure minimum angular speed of 0.5 rad/s
-                angular_speed = min(4.5, abs(angular_speed))  # Ensure maximum angular speed of 4.5 rad/s
-                angular_speed = round(angular_speed, 1)
+                signe = np.sign(angular_speed)
+                angular_speed = max(0.5, abs(angular_speed))  # Ensure minimum angular speed of +/-0.5 rad/s
+                angular_speed = min(4.5, abs(angular_speed))  # Ensure maximum angular speed of +/-4.5 rad/s
+                angular_speed = round(angular_speed, 1)*signe
                 self.set_speed(np.array([0.0, 0.0, angular_speed]))
                 self.set_angular_speed(angular_speed)
             elif abs(distance) > 1.0:  # Forward adjustment
@@ -321,17 +324,18 @@ class RobotMovement:
         else:
             self.set_speed(np.array([0.0, 0.0, 0.0]))
             self.set_straight_speed(0.0)
-            print("no more waypoints")
+            if not (int(self.update_count) % max(5, int(1 / (min(1, average_elapsed_time))))):
+                print("no more waypoints")
 
     def mm_per_second_to_arbitrary_unit(self, v, k=0.39, c=0.409):
         """
         Convert speed in mm/s to the arbitrary motor unit using a linear model.
         :param v: Speed in mm/s
-        :param k: Slope (conversion factor) in mm/s per arbitrary unit (default: 0.39)
-        :param c: Offset (constant) in mm/s (default: 0.409)
+        :param k: Slope (conversion factor) in mm/s per arbitrary unit (default: 0.39) (computed from measurement)
+        :param c: Offset (constant) in mm/s (default: 0.409) (computed from measurement)
         :return: Speed in arbitrary motor units
 
-
+        Measurements made :
         44 mm in 10 sec @ speed = 10
         80 mm in 10 sec @ speed = 20
         120 mm in 10 sec @ speed = 30
@@ -358,7 +362,6 @@ class RobotMovement:
         # Ensure the speed is greater than the offset for valid conversion, otherwise set the speed to 0
         if abs(v) < c:
             return 0
-
         # Perform the conversion
         S = (abs(v) - c) / k
         return int(S*(1 if v >= 0 else -1))
@@ -515,5 +518,5 @@ if __name__ == "__main__":
         end_time = time.time()  # Record the end time
         # Calculate and print the execution time
         execution_time = end_time - start_time
-        print(f"Execution time: {execution_time:.6f} seconds")
+        #print(f"Execution time: {execution_time:.6f} seconds")
 
