@@ -13,15 +13,23 @@ class PathPlanner:
         :param pixel_size_mm: Size of each pixel in millimeters.
         :param n: Minimum distance (in pixels) between points and obstacles.
         """
+
         self.pixel_size_mm = pixel_size_mm
         # This approach ensure that the thymio will not hit any obstacle while not having to evaluate a complex
         # bounding box. we take the small radius (with of the robot) along the line because the robot go straight
         # we take the larger radius at each node as the robot will have to turn on itself at theses point and must
         # avoid colliding into obstacle
+        self.rng_ratio = 0.01
+        self.nb_max_point = 1000
+        self.pixcel_iteration = 5
+        self.points_distance =int(80/self.pixel_size_mm)
         self.pointRadius = int(80/self.pixel_size_mm)  # minimum distance from other points and obstacles(~80mm)
+        self.wall_Radius =int(80/self.pixel_size_mm)
         self.lineRadius = int(55/self.pixel_size_mm)  # minimum distance from other points and obstacles(~55mm)
+        self.init_enhanced_grid = True
+        self.enhanced_grid= []
 
-    def is_valid_point(self, point, grid, placed_points):
+    def is_valid_point(self, point, placed_points):
         """
         Check if the point is valid (i.e., not on an obstacle, not too close to other points).
         :param point: Tuple (x, y) for the point.
@@ -31,18 +39,14 @@ class PathPlanner:
         """
         x, y = point
 
-        # Check if the point itself is on an obstacle or too close to an obstacle
-        if self.is_within_radius(point, grid, self.pointRadius):
-            return False
-
         # Check that the point is not too close to any other placed point
         for placed_point in placed_points:
-            if np.linalg.norm(np.array(placed_point) - np.array(point)) < self.pointRadius:
+            if np.linalg.norm(np.array(placed_point) - np.array(point)) < self.points_distance:
                 return False
 
         return True
 
-    def is_line_colliding(self, start, end, occupancy_grid):
+    def is_line_colliding(self, start, end):
         """
         Check if the straight line between the two points intersects an obstacle in the occupancy grid
         or is within a specified radius of an obstacle.
@@ -59,63 +63,47 @@ class PathPlanner:
         y1 = int(y1)
         y2 = int(y2)
 
-        # Ensure that x1, y1 is the left-most point
-        if x1 > x2:
-            x1, x2 = x2, x1
-            y1, y2 = y2, y1
-
         # Calculate the differences in x and y
         dx = x2 - x1
         dy = y2 - y1
+        slope = dy
+        if dx != 0:
+            slope = slope / dx # Calculate the slope of the line
+
+        if(abs(slope)<=1): #Iter x if small slope
+            if(x1 > x2): # Ensure that x1, y1 is the left-most point
+                x1, x2 = x2, x1
+                y1, y2 = y2, y1
+            for x in range(int(x1), int(x2) + 1, self.pixcel_iteration): # Loop over the x range, calculate y for each x
+                y = y1 + slope * (x - x1)
+                y_int = int(round(y))
+                if(self.enhanced_grid[y_int,x]):
+                    return True
+
+        if(abs(slope)>1): #Iter y if slope too stiff
+            if(y1 > y2): # Ensure that x1, y1 is the left-most point
+                x1, x2 = x2, x1
+                y1, y2 = y2, y1
+            for y in range(int(y1), int(y2) + 1, self.pixcel_iteration): # Loop over the y range, calculate x for each y
+                x = ((y-y1)/slope) + x1
+                x_int = int(round(x))
+                if(self.enhanced_grid[y,x_int]):
+                    return True
 
         # Handle edge cases for vertical or horizontal lines
         if dx == 0:  # Vertical line
-            for y in range(int(min(y1, y2)), int(max(y1, y2)) + 1):
-                if self.is_within_radius((x1, y), occupancy_grid, self.lineRadius):
+            for y in range(int(min(y1, y2)), int(max(y1, y2)) + 1, self.pixcel_iteration):
+                if(self.enhanced_grid[y,x1]):
                     return True
             return False
 
         if dy == 0:  # Horizontal line
-            for x in range(int(min(x1, x2)), int(max(x1, x2)) + 1):
-                if self.is_within_radius((x, y1), occupancy_grid, self.lineRadius):
+            for x in range(int(min(x1, x2)), int(max(x1, x2)) + 1, self.pixcel_iteration):
+                if(self.enhanced_grid[y1,x]):
                     return True
             return False
 
-        # Calculate the slope of the line
-        slope = dy / dx
-
-        # Loop over the x range, calculate y for each x, and check for obstacles within radius
-        for x in range(int(x1), int(x2) + 1):
-            y = y1 + slope * (x - x1)
-            y_int = int(round(y))
-
-            if self.is_within_radius((x, y_int), occupancy_grid, self.lineRadius):
-                return True
-
         return False
-
-    def is_within_radius(self, point, grid, radius):
-        """
-        Check if any obstacle is present within the square region around a point.
-
-        :param point: Tuple (x, y) representing the point.
-        :param grid: 2D numpy array representing the occupancy grid.
-        :param radius: Radius defining the size of the square region.
-        :return: Boolean value, True if an obstacle is within the square region, False otherwise.
-        """
-        x, y = map(int, point)  # Convert point to integer indices
-
-        # Define the bounds of the square region
-        x_min = max(0, x - radius)
-        x_max = min(grid.shape[1], x + radius + 1)
-        y_min = max(0, y - radius)
-        y_max = min(grid.shape[0], y + radius + 1)
-
-        # Extract the square region of interest
-        region = grid[y_min:y_max, x_min:x_max]
-
-        # Check if any value in the region is True
-        return np.any(region)
 
     def compute_angles_for_waypoints(self, waypoints):
         """
@@ -147,6 +135,54 @@ class PathPlanner:
         updated_waypoints.append(np.array([waypoints[-1][0], waypoints[-1][1], last_theta]))
 
         return updated_waypoints
+    
+
+    def compute_enhance_grid(self, occupancy_grid):
+        """
+        Enhances the occupancy grid by marking a disc-shaped neighborhood of True 
+        values around each True cell in the original grid.
+
+        Args:
+            occupancy_grid (np.ndarray): A 2D binary array representing the occupancy grid.
+
+        Returns:
+            np.ndarray: A 2D binary array with the enhanced grid.
+        """
+        #start_time_grid= time.time()
+        # Create the enhanced grid initialized to False
+        enhancing_grid = np.zeros_like(occupancy_grid, dtype=bool)
+        
+        # Get the shape of the grid
+        rows, cols = occupancy_grid.shape
+
+        # Precompute a mask for a disc of radius `lineRadius`
+        radius = self.wall_Radius
+        diameter = 2 * radius + 1
+        y, x = np.ogrid[-radius:radius+1, -radius:radius+1]
+        disc_mask = (x**2 + y**2 <= radius**2)
+        
+        # Loop over the grid and expand the True values using the disc mask
+        for r in range(rows):
+            for c in range(cols):
+                if occupancy_grid[r, c]:
+                    # Calculate the bounding box for the disc neighborhood
+                    row_min = max(0, r - radius)
+                    row_max = min(rows, r + radius + 1)
+                    col_min = max(0, c - radius)
+                    col_max = min(cols, c + radius + 1)
+                    
+                    # Get the part of the disc mask that fits within the grid boundaries
+                    disc_row_start = max(0, radius - r)
+                    disc_row_end = diameter - max(0, r + radius + 1 - rows)
+                    disc_col_start = max(0, radius - c)
+                    disc_col_end = diameter - max(0, c + radius + 1 - cols)
+                    
+                    # Apply the mask to the enhancing grid
+                    enhancing_grid[row_min:row_max, col_min:col_max] |= \
+                        disc_mask[disc_row_start:disc_row_end, disc_col_start:disc_col_end]
+    
+        return enhancing_grid
+
 
     def get_waypoints(self, occupancy_grid, start, target):
         """
@@ -157,13 +193,16 @@ class PathPlanner:
         :param target: Target position (x, y, orientation).
         :return: List of waypoints.
         """
+        if(self.init_enhanced_grid):
+            self.enhanced_grid = self.compute_enhance_grid(occupancy_grid)
+            self.init_enhanced_grid = False
 
         width, height = occupancy_grid.shape
-        free_space = np.argwhere(occupancy_grid == 0)  # Find all free space pixels
+        free_space = np.argwhere(self.enhanced_grid == 0)  # Find all free space pixels
         num_free_pixels = len(free_space)
 
         # Calculate the target number of points to place (5% of free space but cap to 1000)
-        points_to_place = min(int(0.05 * num_free_pixels),1000)
+        points_to_place = min(int(self.rng_ratio * num_free_pixels),self.nb_max_point)
 
         placed_points = []
         # Start and target positions (manually added)
@@ -178,17 +217,20 @@ class PathPlanner:
             if(timeout>points_to_place*2):
                 break # in case its not possible to place all the point dont block the system
             y, x = random.choice(free_space) # value are unpacked in the wrong order for some reason
-            if self.is_valid_point((x, y), occupancy_grid, placed_points):
+            if self.is_valid_point((x, y), placed_points):
                 placed_points.append((x, y)) # if a point taken at random is in a valid place
                 # not too close to an obstacle nor another point.
+    
         # Run A* to find the path from start to target through the placed points
-        waypoints = self.a_star(occupancy_grid, start, target, placed_points)
+        waypoints = self.a_star(start, target, placed_points)
         #retour = []  # to see the point placed at random on the map instead of the waypoints :
         #for p in placed_points:
         #    retour.append((p[0], p[1], 0))
+        #return retour
+        plot_robot_grid(self.enhanced_grid, 1, robot, robot, robot, goal, waypoints) #to see the enhanced grid
         return  self.compute_angles_for_waypoints(waypoints) # the angle are a bonus and simplify teh robot control.
 
-    def a_star(self, grid, startpoint, goalpoint, available_nodes):
+    def a_star(self, startpoint, goalpoint, available_nodes):
         """
         Perform A* search to find a path between start and goal points, considering obstacles and the placed points.
         :param grid: Occupancy grid (True for obstacles, False for free space).
@@ -215,7 +257,6 @@ class PathPlanner:
         g_costs = {start: g_start}  # Store g cost for each node
 
         while open_list:
-            # Get the node with the lowest f value
             _, current = heapq.heappop(open_list)
 
             # If the current node is the goal, reconstruct the path
@@ -238,7 +279,7 @@ class PathPlanner:
                     continue
 
                 # Check if the line between current and neighbor collides with an obstacle
-                if self.is_line_colliding(current, neighbor, grid):
+                if self.is_line_colliding(current, neighbor):
                     continue  # Skip this neighbor if collision detected
 
                 # Calculate the g score for the neighbor
@@ -250,10 +291,11 @@ class PathPlanner:
                     g_costs[neighbor] = tentative_g
                     h = np.linalg.norm(np.array(neighbor) - np.array(goal))
                     f = tentative_g + h
+                    
                     heapq.heappush(open_list, (f, neighbor))  # Add neighbor to open list
 
                     came_from[neighbor] = current  # Record the parent node to reconstruct the path
-
+        
         return []  # Return an empty list if no path found
 
 
@@ -265,8 +307,8 @@ if __name__ == "__main__":
     occupancyGrid = matrix.astype(bool)
 
     # Define the goal and robot states
-    goal = np.array([30, 30, np.pi / 6])  # slightly different than the default camera one
-    robot = np.array([40,400, np.pi / 6])  # slightly different than the default camera one
+    goal = np.array([36, 294, np.pi / 6])  # slightly different than the default camera one
+    robot = np.array([463,382, np.pi / 6])  # slightly different than the default camera one
     print("Robot:", robot)
     print("Goal:", goal)
 
