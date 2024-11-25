@@ -26,7 +26,7 @@ def update_loop(robot):
 def main():
     #
     robot = RobotMovement()
-    vision = VisionSystem()
+    vision = VisionSystem(use_camera=True)
     sensorfusion = SensorFusion()
     pathplanner = PathPlanner(pixel_size_mm=vision.get_pixel_side_mm())
     # Start a separate thread for the update loop

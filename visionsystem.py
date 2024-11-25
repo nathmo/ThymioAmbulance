@@ -36,7 +36,7 @@ class VisionSystem:
 
     def is_camera_ready(self):
         # Check if the camera is ready (returns True or False)
-        cap = cv2.VideoCapture(0)
+        cap = cv2.VideoCapture(2)
 
         if cap.isOpened():
             return True
@@ -47,7 +47,7 @@ class VisionSystem:
         if not self.is_camera_ready():
             return None
 
-        cap = cv2.VideoCapture(0)
+        cap = cv2.VideoCapture(2)
         capture, frame = cap.read() #capture = bouleen and frame = (hauteur, largeur, nbr_colorRGB_use)
 
         if capture:
