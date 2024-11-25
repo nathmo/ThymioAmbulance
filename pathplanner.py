@@ -114,25 +114,27 @@ class PathPlanner:
         :return: List of updated waypoints with computed theta values.
         """
         updated_waypoints = []
+        if len(waypoints)>1:
+            for i in range(len(waypoints) - 1):
+                # Current and next waypoints
+                current = waypoints[i]
+                next_wp = waypoints[i + 1]
 
-        for i in range(len(waypoints) - 1):
-            # Current and next waypoints
-            current = waypoints[i]
-            next_wp = waypoints[i + 1]
+                # Compute the delta x and delta y
+                delta_x = next_wp[0] - current[0]
+                delta_y = next_wp[1] - current[1]
 
-            # Compute the delta x and delta y
-            delta_x = next_wp[0] - current[0]
-            delta_y = next_wp[1] - current[1]
+                # Compute the angle (theta) using arctan2, adjusting to clockwise from x-axis
+                theta = np.arctan2(-delta_y, delta_x)
 
-            # Compute the angle (theta) using arctan2, adjusting to clockwise from x-axis
-            theta = np.arctan2(-delta_y, delta_x)
+                # Update the current waypoint with the computed angle
+                updated_waypoints.append(np.array([current[0], current[1], theta]))
 
-            # Update the current waypoint with the computed angle
-            updated_waypoints.append(np.array([current[0], current[1], theta]))
-
-        # Append the last waypoint with the same theta as the second-to-last one
-        last_theta = updated_waypoints[-1][2] if updated_waypoints else 0
-        updated_waypoints.append(np.array([waypoints[-1][0], waypoints[-1][1], last_theta]))
+            # Append the last waypoint with the same theta as the second-to-last one
+            last_theta = updated_waypoints[-1][2] if updated_waypoints else 0
+            updated_waypoints.append(np.array([waypoints[-1][0], waypoints[-1][1], last_theta]))
+        else:
+            updated_waypoints = waypoints
 
         return updated_waypoints
     
@@ -227,7 +229,7 @@ class PathPlanner:
         #for p in placed_points:
         #    retour.append((p[0], p[1], 0))
         #return retour
-        plot_robot_grid(self.enhanced_grid, 1, robot, robot, robot, goal, waypoints) #to see the enhanced grid
+        #plot_robot_grid(self.enhanced_grid, 1, robot, robot, robot, goal, waypoints) #to see the enhanced grid
         return  self.compute_angles_for_waypoints(waypoints) # the angle are a bonus and simplify teh robot control.
 
     def a_star(self, startpoint, goalpoint, available_nodes):

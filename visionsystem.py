@@ -36,7 +36,7 @@ class VisionSystem:
 
     def is_camera_ready(self):
         # Check if the camera is ready (returns True or False)
-        cap = cv2.VideoCapture(0)
+        cap = cv2.VideoCapture(2)
 
         if cap.isOpened():
             return True
@@ -47,7 +47,7 @@ class VisionSystem:
         if not self.is_camera_ready():
             return None
 
-        cap = cv2.VideoCapture(0)
+        cap = cv2.VideoCapture(2)
         capture, frame = cap.read() #capture = bouleen and frame = (hauteur, largeur, nbr_colorRGB_use)
 
         if capture:
@@ -63,6 +63,8 @@ class VisionSystem:
             frame = self.capture_frame()
             if frame is None:
                 print("Erreur lors de la capture de la frame depuis la caméra.")
+            # Ensure the result directory exists
+
             return frame
         else:
             frame = cv2.imread(self.image_path)
@@ -83,7 +85,20 @@ class VisionSystem:
         """
 
         frame = self.get_frame()
+        result_dir = "result"
+        # os.makedirs(result_dir, exist_ok=True)
 
+        # Generate the file name based on the current UNIX timestamp
+        timestamp = int(time.time())
+        file_name = f"calibration_{timestamp}.png"
+        file_path = os.path.join(result_dir, file_name)
+
+        # Save the frame
+        success = cv2.imwrite(file_path, frame)
+        if success:
+            print(f"Frame saved at: {file_path}")
+        else:
+            print("Erreur : Impossible de sauvegarder la frame.")
         # Checkerboard dimensions (inner corners: one less than the squares in each row/col)
         checkerboard_dims = (7, 7)  # 8x8 checkerboard has 7x7 inner corners
 
@@ -257,22 +272,52 @@ class VisionSystem:
         # Returning an example value as placeholder
         return None
 
-
     def generate_occupancy_grid(self):
         # Create and return an NxM occupancy grid based on the map layout
         # True means the space is occupied, False means it's free
         # Grid layout: 0,0 is the lower left corner, rows are along x and columns along y
 
         frame = self.get_frame()
+        if frame is None:
+            print("Erreur : Aucun frame disponible pour générer la grille d'occupation.")
+            return None
 
-        # Étape 1: Convertir l'image en niveaux de gris
+        # Step 1: Convert the image to grayscale
         gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
-        # Étape 2: Appliquer un filtre pour accentuer les objets, applique filtre pour réduire le bruit
+        # Step 2: Apply a Gaussian blur to reduce noise and enhance objects
         blurred_frame = cv2.GaussianBlur(gray_frame, (5, 5), 0)
 
-        # Étape 3: Appliquer un seuil (Otsu) pour binariser l'image
+        # Step 3: Apply Otsu's thresholding to binarize the image
         _, binary_frame = cv2.threshold(blurred_frame, 0, 1, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+
+        # Ensure the result directory exists
+        result_dir = "result"
+        os.makedirs(result_dir, exist_ok=True)
+
+        # Generate the file name with the current UNIX timestamp
+        timestamp = int(time.time())
+        txt_file_name = f"occupancyGrid_{timestamp}.txt"
+        txt_file_path = os.path.join(result_dir, txt_file_name)
+
+        png_file_name = f"occupancyGrid_{timestamp}.png"
+        png_file_path = os.path.join(result_dir, png_file_name)
+
+        # Save the grid as a .txt file
+        try:
+            np.savetxt(txt_file_path, binary_frame, fmt='%d', delimiter=' ')
+            print(f"Occupancy grid saved as .txt at: {txt_file_path}")
+        except Exception as e:
+            print(f"Erreur : Impossible de sauvegarder la grille d'occupation en .txt. {e}")
+
+        # Save the grid as a .png file
+        try:
+            # Convert the binary frame (0 and 1) to an image (0 and 255 for black and white)
+            image_frame = (1 - binary_frame) * 255  # Invert values: True (occupied) -> black (0), False -> white (255)
+            cv2.imwrite(png_file_path, image_frame)
+            print(f"Occupancy grid saved as .png at: {png_file_path}")
+        except Exception as e:
+            print(f"Erreur : Impossible de sauvegarder la grille d'occupation en .png. {e}")
 
         return binary_frame
 

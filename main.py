@@ -7,8 +7,8 @@ from pathplanner import PathPlanner
 import numpy as np
 
 def update_loop(robot):
-    """Function to run robot.update() in a separate thread at ~100 Hz."""
-    interval = 0.01  # 10 ms interval (100 Hz)
+    """Function to run robot.update() in a separate thread at ~1 Hz."""
+    interval = 1  # 1000 ms interval (1 Hz)
 
     while True:
         start_time = time.perf_counter()  # Record the start time
@@ -26,7 +26,8 @@ def update_loop(robot):
 def main():
     #
     robot = RobotMovement()
-    vision = VisionSystem()
+    robot.connect()
+    vision = VisionSystem(use_camera=True)
     sensorfusion = SensorFusion()
     pathplanner = PathPlanner(pixel_size_mm=vision.get_pixel_side_mm())
     # Start a separate thread for the update loop
@@ -34,7 +35,7 @@ def main():
     update_thread.daemon = True  # Daemonize thread to exit when main program exits
     update_thread.start()
 
-    interval = 1  # 1000 ms interval (1 Hz)
+    interval = 5  # 5000 ms interval (0.2 Hz)
     while True:
         start_time = time.perf_counter()  # Record the start time
         '''
@@ -56,8 +57,11 @@ def main():
         robotPosFromFusion = sensorfusion.get_estimated_position(robotPosFromEncoder, robotSpeedFromEncoder, robotPosFromCamera)
         waypoints = pathplanner.get_waypoints(occupancyGrid, robotPosFromFusion, goalPosFromCamera)
         robot.set_position(robotPosFromFusion)
-        robot.set_waypoints(waypoints)
+        #robot.set_waypoints(waypoints)
+        robot.set_waypoints([goalPosFromCamera])
         print("Main ran and have the following intermediate value : ")
+        #print("occupancyGrid : ")
+        #print(occupancyGrid)
         print("waypoints : " + str(waypoints))
         print("number of waypoints : " + str(len(waypoints)))
         print("robotPosFromCamera : "+str(robotPosFromCamera))
