@@ -50,9 +50,10 @@ class VisionSystem:
             return None
 
         cap = cv2.VideoCapture(self.cameraID)
-        capture, frame = cap.read() #capture = bouleen and frame = (hauteur, largeur, nbr_colorRGB_use)
+        capture, frame = cap.read()  # capture = boolean, frame = (height, width, number_of_colors_RGB)
 
         if capture:
+            # Horizontally flip the frame
             cap.release()
             return frame
         else:

@@ -113,6 +113,20 @@ class PathPlanner:
 
         return False
 
+    def scale_and_flip_waypoints(self, waypoints, pixel_height, pixel_width):
+        """
+        flip vertically the coordinate and scale back to the correct size in mm
+
+        :param waypoints: List of numpy arrays where each array is of the form [x, y].
+        :return: List of updated waypoints.
+        """
+        updated_waypoints = []
+
+        for i in range(len(waypoints) - 1):
+            updated_waypoints.append(np.array([waypoints[i][0]*self.pixel_size_mm, (pixel_height-waypoints[i][1]-20)*self.pixel_size_mm]))
+
+        return updated_waypoints
+
     def compute_angles_for_waypoints(self, waypoints):
         """
         Computes the angle (theta) between consecutive waypoints and updates the last value of each waypoint with the computed theta.
@@ -137,13 +151,13 @@ class PathPlanner:
                 theta = np.arctan2(-delta_y, delta_x)
 
                 # Update the current waypoint with the computed angle
-                updated_waypoints.append(np.array([current[0]*self.pixel_size_mm, current[1]*self.pixel_size_mm, theta]))
+                updated_waypoints.append(np.array([current[0], current[1], theta]))
 
             # Append the last waypoint with the same theta as the second-to-last one
             last_theta = updated_waypoints[-1][2] if updated_waypoints else 0
-            updated_waypoints.append(np.array([waypoints[-1][0]*self.pixel_size_mm, waypoints[-1][1]*self.pixel_size_mm, last_theta]))
+            updated_waypoints.append(np.array([waypoints[-1][0], waypoints[-1][1], last_theta]))
         else:
-            updated_waypoints = waypoints
+            updated_waypoints=[np.array([waypoints[0][0], waypoints[0][1], 0])]
         return updated_waypoints
 
     def compute_enhance_grid(self, occupancy_grid):
@@ -238,6 +252,7 @@ class PathPlanner:
         #   retour.append((p[0]*self.pixel_size_mm, p[1]*self.pixel_size_mm, 0))
         #return retour
         #plot_robot_grid(self.enhanced_grid, 1, robot, robot, robot, goal, waypoints)  # to see the enhanced grid
+        waypoints = self.scale_and_flip_waypoints(waypoints, width, height)
         return self.compute_angles_for_waypoints(waypoints)  # the angle are a bonus and simplify teh robot control.
 
     def a_star(self, startpoint, goalpoint, available_nodes):
@@ -315,7 +330,7 @@ if __name__ == "__main__":
     path = os.path.join("testData", "mapWithBlackObstacle1.txt") #mapOneIsland2
     matrix = np.loadtxt(path, dtype=int)
     occupancyGrid = matrix.astype(bool)
-    vision = VisionSystem(use_camera=True)
+    vision = VisionSystem(use_camera=False, image_path="result\calibration_1732636582.png")
     occupancyGrid = vision.generate_occupancy_grid()
     # Define the goal and robot states
     goal = np.array([36, 294, np.pi / 6])  # slightly different than the default camera one
@@ -337,7 +352,7 @@ if __name__ == "__main__":
     print("number of waypoints "+str(len(waypoints)))
     print("waypoints "+str(waypoints))
     end_time = time.time()
-    occupancyGrid = planner.enhanced_grid
+    #occupancyGrid = planner.enhanced_grid
     # Plot and finalize
     plot_robot_grid(occupancyGrid, vision.get_pixel_side_mm(), robot, robot, robot, goal, waypoints)
     print("Waypoint calculation complete.")

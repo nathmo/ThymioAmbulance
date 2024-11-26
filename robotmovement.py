@@ -273,7 +273,7 @@ class RobotMovement:
             delta = next_waypoint - self.position
 
             # Compute signed distance and angular difference
-            angle_to_target = np.arctan2(delta[1], delta[0])
+            angle_to_target = -np.arctan2(delta[1], delta[0])
             angle_diff = angle_to_target - self.position[2]
             distance_vector = delta[:2]
             if(abs(angle_diff)<np.pi):
@@ -290,6 +290,7 @@ class RobotMovement:
                 print("angle to target : " + str(angle_diff))
                 print("average elapsed time "+str(average_elapsed_time))
                 print("time since last print "+str(average_elapsed_time*self.update_count))
+                print("waypoints left to reach : " + str(len(self.get_waypoints())))
             # Normalize angle_diff to [-pi, pi]
             angle_diff = (angle_diff + np.pi) % (2 * np.pi) - np.pi
 
@@ -314,8 +315,8 @@ class RobotMovement:
                 forward_speed = min(100.0, abs(forward_speed))  # Ensure maximum forward speed of 100 mm/s
                 forward_speed = round(forward_speed, 0) # the motor speed use a int
                 theta = position[2]  # Angle (in radians) from the x-axis
-                vx = forward_speed * np.cos(theta)  # Project forward speed onto the x-axis
-                vy = forward_speed * np.sin(theta)  # Project forward speed onto the y-axis
+                vx = forward_speed * np.cos(-theta)  # Project forward speed onto the x-axis
+                vy = forward_speed * np.sin(-theta)  # Project forward speed onto the y-axis
                 # Set the projected speed
                 self.set_speed(np.array([vx, vy, 0.0]))
                 self.set_straight_speed(forward_speed)
@@ -504,9 +505,11 @@ if __name__ == "__main__":
     robot = RobotMovement()
     robot.connect()
     print("setting waypoints")
-    robot.set_straight_speed(0)
-    robot.set_waypoints([np.array([50.0, 0.0, 0.0]), np.array([50.0, 50.0, 0.0]), np.array([0.0, 50.0, 0.0]), np.array([0.0, 0.0, 0.0])])
-
+    robot.set_straight_speed(0.0)
+    #robot.set_position(np.array([0.0, 0.0, 0.0]))
+    #robot.set_waypoints([np.array([100.0, 0.0, 0.0]), np.array([100.0, 100.0, 0.0]), np.array([0.0, 100.0, 0.0]), np.array([0.0, 0.0, 0.0])])
+    robot.set_waypoints([np.array([1446.51550293,  379.81130981,   -3.08813006]), np.array([1144.,  396.,   -2.57392623]), np.array([868., 572.,  -2.39415094]), np.array([540., 876.,  -1.17055567]), np.array([ 5.84000000e+02,  9.80000000e+02, -9.63491102e-01]), np.array([ 7.48000000e+02,  1.21600000e+03, -8.15691923e-01]), np.array([ 9.40000000e+02,  1.42000000e+03, -2.75805899e-01]), np.array([1.15200000e+03, 1.48000000e+03, 5.72218689e-01]), np.array([1.38590723e+03, 1.32933960e+03, 5.72218689e-01])])
+    robot.set_position(np.array([1446.51550293,  379.81130981,   -3.08813006]))
     #robot.set_angular_speed(1)
     #time.sleep(np.pi)
     #robot.set_angular_speed(0.0)
@@ -522,6 +525,7 @@ if __name__ == "__main__":
         #robot.set_straight_speed(i)
         #time.sleep(0.5)
         robot.update()
+        #print("waypoints left to reach : "+str(len(robot.get_waypoints())))
         #i=i+1
         #print(i)
         #robot.set_straight_speed(i)

@@ -24,19 +24,22 @@ def plot_robot_grid(occupancyGrid, gridSquareSizeMM, robotPosFromEncoder, robotP
     # Display the occupancy grid as a black and white grid
     grid_size = gridSquareSizeMM  # each cell is n mm with and tall
     height, width = occupancyGrid.shape
-    ax.imshow(occupancyGrid, cmap='gray_r', origin='lower', extent=[0, width * grid_size, 0, height * grid_size])
+    ax.imshow(occupancyGrid, cmap='gray_r', origin='upper', extent=[0, width * grid_size, 0, height * grid_size])
     # Obstacle (value set to true) are in white
 
     # Plot robot and goal positions with their orientations
-    def plot_position_with_orientation(position, color, label):
+    def plot_position_with_orientation(position, color, label, plot_height):
         x, y, theta = position
+        # Adjust y to assume origin is at the upper-left corner
+        y = plot_height - y
         ax.plot(x, y, 'o', color=color, label=label)
         ax.arrow(x, y, np.cos(theta) * 10, np.sin(theta) * 10, head_width=5, head_length=5, fc=color, ec=color)
 
-    plot_position_with_orientation(robotPosFromEncoder, 'blue', 'Robot Encoder Position')
-    plot_position_with_orientation(robotPosFromCamera, 'green', 'Robot Camera Position')
-    plot_position_with_orientation(robotPosFromFusion, 'purple', 'Robot Fusion Position')
-    plot_position_with_orientation(goalPosFromCamera, 'red', 'Goal Position')
+    # Plot positions with the adjusted y-coordinate
+    plot_position_with_orientation(robotPosFromEncoder, 'blue', 'Robot Encoder Position', height*gridSquareSizeMM)
+    plot_position_with_orientation(robotPosFromCamera, 'green', 'Robot Camera Position', height*gridSquareSizeMM)
+    plot_position_with_orientation(robotPosFromFusion, 'purple', 'Robot Fusion Position', height*gridSquareSizeMM)
+    plot_position_with_orientation(goalPosFromCamera, 'red', 'Goal Position', height*gridSquareSizeMM)
 
     # Plot waypoints
     for idx, waypoint in enumerate(waypoints):

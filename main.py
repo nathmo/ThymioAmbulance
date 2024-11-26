@@ -37,6 +37,8 @@ def main():
 
     interval = 5  # 5000 ms interval (0.2 Hz)
     numberOfWaypoints = 1000
+
+    # compute only once the waypoints.
     while True:
         start_time = time.perf_counter()  # Record the start time
         '''
