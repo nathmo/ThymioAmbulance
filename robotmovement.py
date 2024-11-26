@@ -222,6 +222,8 @@ class RobotMovement:
                 print(f"Error unlocking the robot: {e}")
 
     def connect(self):
+        print("IP address "+str(self.client.tdm_addr))
+        print("Port "+str(self.client.tdm_port))
         self.node = aw(self.client.wait_for_node())
         aw(self.node.lock())
         aw(self.client.wait_for_status(self.client.NODE_STATUS_READY))

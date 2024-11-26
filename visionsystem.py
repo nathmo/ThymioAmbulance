@@ -19,9 +19,11 @@ class VisionSystem:
         self.use_camera = use_camera  # Booléen true si on utilise camera, false si on veut utiliser une image statique
         self.image_path = image_path # Chemin de l'image si use_camera est False
 
-        self.aruco_robot_id = 5
-        self.aruco_target_id = 4
+        self.aruco_robot_id = 4
+        self.aruco_target_id = 5
 
+        self.debug = True
+        self.cameraID = 2
         #Function qui determine si on prend camera ou frame choisi
         if self.use_camera:
             print("Utilisation de la caméra")
@@ -36,7 +38,7 @@ class VisionSystem:
 
     def is_camera_ready(self):
         # Check if the camera is ready (returns True or False)
-        cap = cv2.VideoCapture(2)
+        cap = cv2.VideoCapture(self.cameraID)
 
         if cap.isOpened():
             return True
@@ -47,7 +49,7 @@ class VisionSystem:
         if not self.is_camera_ready():
             return None
 
-        cap = cv2.VideoCapture(2)
+        cap = cv2.VideoCapture(self.cameraID)
         capture, frame = cap.read() #capture = bouleen and frame = (hauteur, largeur, nbr_colorRGB_use)
 
         if capture:
@@ -191,9 +193,9 @@ class VisionSystem:
             marker_robot = next((m for m in marker_centers if m[0] == self.aruco_robot_id), None)
 
             if marker_robot:
-                # Get the corners of marker ID 5 to compute orientation
-                idx = list(ids.flatten()).index(5)  # Index of marker ID 5
-                corners_robot = corners[idx][0]  # Extract corners of marker ID 5
+                # Get the corners of marker to compute orientation
+                idx = list(ids.flatten()).index(self.aruco_robot_id)  # Index of marker
+                corners_robot = corners[idx][0]  # Extract corners of marker
 
                 # Define two adjacent corners for angle calculation
                 corner1 = corners_robot[0]  # Top-left corner
@@ -215,9 +217,9 @@ class VisionSystem:
             else:
                 print("Marker ID for robot not found in the frame.")
         else:
-            print("No ArUco markers detected.")
+            print("No ArUco markers detected. return 0,0,0")
         # Returning an example value as placeholder
-        return None
+        return np.array([0, 0, 0])
 
 
     def get_goal_position(self):
@@ -245,8 +247,8 @@ class VisionSystem:
 
             if marker:
                 # Get the corners of marker ID 5 to compute orientation
-                idx = list(ids.flatten()).index(5)  # Index of marker ID 5
-                corners_robot = corners[idx][0]  # Extract corners of marker ID 5
+                idx = list(ids.flatten()).index(self.aruco_target_id)
+                corners_robot = corners[idx][0]  # Extract corners
 
                 # Define two adjacent corners for angle calculation
                 corner1 = corners_robot[0]  # Top-left corner
@@ -268,9 +270,9 @@ class VisionSystem:
             else:
                 print("Marker ID for goal not found in the frame.")
         else:
-            print("No ArUco markers detected.")
+            print("No ArUco markers detected. return 0,0,0")
         # Returning an example value as placeholder
-        return None
+        return np.array([0, 0, 0])
 
     def generate_occupancy_grid(self):
         # Create and return an NxM occupancy grid based on the map layout
@@ -282,42 +284,56 @@ class VisionSystem:
             print("Erreur : Aucun frame disponible pour générer la grille d'occupation.")
             return None
 
-        # Step 1: Convert the image to grayscale
+        # Step 1: Detect and replace ArUco markers with white squares
+        # Detect markers using the provided dictionary and parameters
+        corners, ids, _ = cv2.aruco.detectMarkers(frame, self.aruco_dict, parameters=self.parameters)
+
+        # Replace detected markers with white squares
+        if ids is not None:
+            for corner in corners:
+                # Get the corners of the marker
+                pts = corner[0].astype(int)
+                # Fill the polygon defined by these corners with white
+                cv2.fillPoly(frame, [pts], color=(255, 255, 255))
+
+        # Step 2: Convert the image to grayscale
         gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
-        # Step 2: Apply a Gaussian blur to reduce noise and enhance objects
+        # Step 3: Apply a Gaussian blur to reduce noise and enhance objects
         blurred_frame = cv2.GaussianBlur(gray_frame, (5, 5), 0)
 
-        # Step 3: Apply Otsu's thresholding to binarize the image
+        # Step 4: Apply Otsu's thresholding to binarize the image
         _, binary_frame = cv2.threshold(blurred_frame, 0, 1, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
 
-        # Ensure the result directory exists
-        result_dir = "result"
-        os.makedirs(result_dir, exist_ok=True)
+        if self.debug:  # Save the occupancy grid as .txt and .png if in debug mode
+            # Ensure the result directory exists
+            result_dir = "result"
+            os.makedirs(result_dir, exist_ok=True)
 
-        # Generate the file name with the current UNIX timestamp
-        timestamp = int(time.time())
-        txt_file_name = f"occupancyGrid_{timestamp}.txt"
-        txt_file_path = os.path.join(result_dir, txt_file_name)
+            # Generate the file name with the current UNIX timestamp
+            timestamp = int(time.time())
+            txt_file_name = f"occupancyGrid_{timestamp}.txt"
+            txt_file_path = os.path.join(result_dir, txt_file_name)
 
-        png_file_name = f"occupancyGrid_{timestamp}.png"
-        png_file_path = os.path.join(result_dir, png_file_name)
+            png_file_name = f"occupancyGrid_{timestamp}.png"
+            png_file_path = os.path.join(result_dir, png_file_name)
 
-        # Save the grid as a .txt file
-        try:
-            np.savetxt(txt_file_path, binary_frame, fmt='%d', delimiter=' ')
-            print(f"Occupancy grid saved as .txt at: {txt_file_path}")
-        except Exception as e:
-            print(f"Erreur : Impossible de sauvegarder la grille d'occupation en .txt. {e}")
+            # Save the grid as a .txt file
+            try:
+                np.savetxt(txt_file_path, binary_frame, fmt='%d', delimiter=' ')
+                print(f"Occupancy grid saved as .txt at: {txt_file_path}")
+            except Exception as e:
+                print(f"Erreur : Impossible de sauvegarder la grille d'occupation en .txt. {e}")
 
-        # Save the grid as a .png file
-        try:
-            # Convert the binary frame (0 and 1) to an image (0 and 255 for black and white)
-            image_frame = (1 - binary_frame) * 255  # Invert values: True (occupied) -> black (0), False -> white (255)
-            cv2.imwrite(png_file_path, image_frame)
-            print(f"Occupancy grid saved as .png at: {png_file_path}")
-        except Exception as e:
-            print(f"Erreur : Impossible de sauvegarder la grille d'occupation en .png. {e}")
+            # Save the grid as a .png file
+            try:
+                # Convert the binary frame (0 and 1) to an image (0 and 255 for black and white)
+                image_frame = (
+                                          1 - binary_frame) * 255  # Invert values: True (occupied) -> black (0), False -> white (255)
+                cv2.imwrite(png_file_path, image_frame)
+                print(f"Occupancy grid saved as .png at: {png_file_path}")
+            except Exception as e:
+                print(f"Erreur : Impossible de sauvegarder la grille d'occupation en .png. {e}")
 
         return binary_frame
 

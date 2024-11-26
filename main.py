@@ -36,6 +36,7 @@ def main():
     update_thread.start()
 
     interval = 5  # 5000 ms interval (0.2 Hz)
+    numberOfWaypoints = 1000
     while True:
         start_time = time.perf_counter()  # Record the start time
         '''
@@ -55,8 +56,11 @@ def main():
         robotPosFromEncoder = robot.get_position()
         robotSpeedFromEncoder = robot.get_speed()
         robotPosFromFusion = sensorfusion.get_estimated_position(robotPosFromEncoder, robotSpeedFromEncoder, robotPosFromCamera)
-        waypoints = pathplanner.get_waypoints(occupancyGrid, robotPosFromFusion, goalPosFromCamera)
         robot.set_position(robotPosFromFusion)
+        waypoints = pathplanner.get_waypoints(occupancyGrid, robotPosFromFusion, goalPosFromCamera)
+        #if len(robot.get_position()) < numberOfWaypoints:
+        #    robot.set_position(waypoints)
+        #    numberOfWaypoints = len(robot.get_position())
         #robot.set_waypoints(waypoints)
         robot.set_waypoints([goalPosFromCamera])
         print("Main ran and have the following intermediate value : ")
