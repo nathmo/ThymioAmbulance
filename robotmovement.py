@@ -323,6 +323,14 @@ class RobotMovement:
                 # Reached waypoint, update to the next
                 self.set_waypoints(waypoints[1:])
                 print("Waypoint reached")
+
+            ir_sensors = self.get_proximity_ir_sensor()
+
+            if (ir_sensors[0]+ir_sensors[1]+ir_sensors[2]+ir_sensors[3]+ir_sensors[4]) > distance_threshold: 
+                    if (ir_sensors[0]+ir_sensors[1]+ir_sensors[2]>ir_sensors[3]+ir_sensors[4]): #turn left
+                        self.set_angular_speed(-1)   #turn left with a speed of one radian per second ~= 57 degrees per second
+                    elif (ir_sensors[3]+ir_sensors[4]>ir_sensors[0]+ir_sensors[1]+ir_sensors[2]): #turn right
+                        self.set_angular_speed(1)    #turn right with a speed of one radian per second ~= 57 degrees per second        
         else:
             self.set_speed(np.array([0.0, 0.0, 0.0]))
             self.set_straight_speed(0.0)
