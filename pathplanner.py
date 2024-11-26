@@ -81,6 +81,7 @@ class PathPlanner:
                 y = y1 + slope * (x - x1)
                 y_int = int(round(y))
                 if (self.enhanced_grid[y_int, x]):
+                    #print("A y: " + str(y_int)+" x "+str(x))
                     return True
 
         if (abs(slope) > 1):  # Iter y if slope too stiff
@@ -92,18 +93,21 @@ class PathPlanner:
                 x = ((y - y1) / slope) + x1
                 x_int = int(round(x))
                 if (self.enhanced_grid[y, x_int]):
+                    #print("B y: " + str(y)+" x_int "+str(x_int))
                     return True
 
         # Handle edge cases for vertical or horizontal lines
         if dx == 0:  # Vertical line
             for y in range(int(min(y1, y2)), int(max(y1, y2)) + 1, self.pixcel_iteration):
                 if (self.enhanced_grid[y, x1]):
+                    #print("C y: " + str(y)+" x "+str(x1))
                     return True
             return False
 
         if dy == 0:  # Horizontal line
             for x in range(int(min(x1, x2)), int(max(x1, x2)) + 1, self.pixcel_iteration):
                 if (self.enhanced_grid[y1, x]):
+                    #print("D y: " + str(y1)+" x "+str(x))
                     return True
             return False
 
@@ -117,27 +121,29 @@ class PathPlanner:
         :param waypoints: List of numpy arrays where each array is of the form [x, y, theta].
         :return: List of updated waypoints with computed theta values.
         """
-        updated_waypoints = []
+        if len(waypoints)>1:
+            updated_waypoints = []
 
-        for i in range(len(waypoints) - 1):
-            # Current and next waypoints
-            current = waypoints[i]
-            next_wp = waypoints[i + 1]
+            for i in range(len(waypoints) - 1):
+                # Current and next waypoints
+                current = waypoints[i]
+                next_wp = waypoints[i + 1]
 
-            # Compute the delta x and delta y
-            delta_x = next_wp[0] - current[0]
-            delta_y = next_wp[1] - current[1]
+                # Compute the delta x and delta y
+                delta_x = next_wp[0] - current[0]
+                delta_y = next_wp[1] - current[1]
 
-            # Compute the angle (theta) using arctan2, adjusting to clockwise from x-axis
-            theta = np.arctan2(-delta_y, delta_x)
+                # Compute the angle (theta) using arctan2, adjusting to clockwise from x-axis
+                theta = np.arctan2(-delta_y, delta_x)
 
-            # Update the current waypoint with the computed angle
-            updated_waypoints.append(np.array([current[0], current[1], theta]))
+                # Update the current waypoint with the computed angle
+                updated_waypoints.append(np.array([current[0]*self.pixel_size_mm, current[1]*self.pixel_size_mm, theta]))
 
-        # Append the last waypoint with the same theta as the second-to-last one
-        last_theta = updated_waypoints[-1][2] if updated_waypoints else 0
-        updated_waypoints.append(np.array([waypoints[-1][0], waypoints[-1][1], last_theta]))
-
+            # Append the last waypoint with the same theta as the second-to-last one
+            last_theta = updated_waypoints[-1][2] if updated_waypoints else 0
+            updated_waypoints.append(np.array([waypoints[-1][0]*self.pixel_size_mm, waypoints[-1][1]*self.pixel_size_mm, last_theta]))
+        else:
+            updated_waypoints = waypoints
         return updated_waypoints
 
     def compute_enhance_grid(self, occupancy_grid):
@@ -208,8 +214,10 @@ class PathPlanner:
 
         placed_points = []
         # Start and target positions (manually added)
-        placed_points.append(tuple(start[:2]))
-        placed_points.append(tuple(target[:2]))
+        scaled_start = tuple(start[:2]/self.pixel_size_mm)
+        scaled_target = tuple(target[:2]/self.pixel_size_mm)
+        placed_points.append(scaled_start)
+        placed_points.append(scaled_target)
 
         # Place random points
         timeout = 0
@@ -224,12 +232,12 @@ class PathPlanner:
                 # not too close to an obstacle nor another point.
 
         # Run A* to find the path from start to target through the placed points
-        waypoints = self.a_star(start, target, placed_points)
-        # retour = []  # to see the point placed at random on the map instead of the waypoints :
-        # for p in placed_points:
-        #    retour.append((p[0], p[1], 0))
-        # return retour
-        plot_robot_grid(self.enhanced_grid, 1, robot, robot, robot, goal, waypoints)  # to see the enhanced grid
+        waypoints = self.a_star(scaled_start, scaled_target, placed_points)
+        retour = []  # to see the point placed at random on the map instead of the waypoints :
+        #for p in placed_points:
+        #   retour.append((p[0]*self.pixel_size_mm, p[1]*self.pixel_size_mm, 0))
+        #return retour
+        #plot_robot_grid(self.enhanced_grid, 1, robot, robot, robot, goal, waypoints)  # to see the enhanced grid
         return self.compute_angles_for_waypoints(waypoints)  # the angle are a bonus and simplify teh robot control.
 
     def a_star(self, startpoint, goalpoint, available_nodes):
@@ -282,6 +290,7 @@ class PathPlanner:
 
                 # Check if the line between current and neighbor collides with an obstacle
                 if self.is_line_colliding(current, neighbor):
+                    #print("skipped : "+str(current)+" trying to reach"+str(neighbor))
                     continue  # Skip this neighbor if collision detected
 
                 # Calculate the g score for the neighbor
@@ -325,9 +334,10 @@ if __name__ == "__main__":
     # Time the waypoint calculation
     start_time = time.time()
     waypoints = planner.get_waypoints(occupancyGrid, robot, goal)
+    print("number of waypoints "+str(len(waypoints)))
     print("waypoints "+str(waypoints))
     end_time = time.time()
-    #EnhancedOccupancyGrid = planner.enhanced_grid
+    occupancyGrid = planner.enhanced_grid
     # Plot and finalize
     plot_robot_grid(occupancyGrid, vision.get_pixel_side_mm(), robot, robot, robot, goal, waypoints)
     print("Waypoint calculation complete.")

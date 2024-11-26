@@ -22,9 +22,9 @@ def plot_robot_grid(occupancyGrid, gridSquareSizeMM, robotPosFromEncoder, robotP
     fig, ax = plt.subplots(figsize=(8, 8))
 
     # Display the occupancy grid as a black and white grid
-    grid_size = gridSquareSizeMM  # each cell is 10mm
+    grid_size = gridSquareSizeMM  # each cell is n mm with and tall
     height, width = occupancyGrid.shape
-    ax.imshow(occupancyGrid, cmap='gray', origin='lower', extent=[0, width * grid_size, 0, height * grid_size])
+    ax.imshow(occupancyGrid, cmap='gray_r', origin='lower', extent=[0, width * grid_size, 0, height * grid_size])
     # Obstacle (value set to true) are in white
 
     # Plot robot and goal positions with their orientations

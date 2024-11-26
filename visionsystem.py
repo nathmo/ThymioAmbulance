@@ -305,6 +305,9 @@ class VisionSystem:
         # Step 4: Apply Otsu's thresholding to binarize the image
         _, binary_frame = cv2.threshold(blurred_frame, 0, 1, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
 
+        # Invert the pixel values: black becomes white, and white becomes black
+        binary_frame = 1 - binary_frame
+
         if self.debug:  # Save the occupancy grid as .txt and .png if in debug mode
             # Ensure the result directory exists
             result_dir = "result"
@@ -328,8 +331,7 @@ class VisionSystem:
             # Save the grid as a .png file
             try:
                 # Convert the binary frame (0 and 1) to an image (0 and 255 for black and white)
-                image_frame = (
-                                          1 - binary_frame) * 255  # Invert values: True (occupied) -> black (0), False -> white (255)
+                image_frame = (1-binary_frame) * 255
                 cv2.imwrite(png_file_path, image_frame)
                 print(f"Occupancy grid saved as .png at: {png_file_path}")
             except Exception as e:
