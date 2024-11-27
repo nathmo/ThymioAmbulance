@@ -1,6 +1,8 @@
 import numpy as np
 import cv2
-from helper import *
+from visualisation import Visualisation
+import time
+import os
 
 class VisionSystem:
     def __init__(self, use_camera=False, image_path="testData\Image_iphone_path.png", checker_board_length=175):
@@ -351,7 +353,7 @@ class VisionSystem:
 
 
 if __name__ == "__main__":
-    visionsystem = VisionSystem()
+    visionsystem = VisionSystem(use_camera=False, image_path=os.path.join("testData", "calibration_1732640447.png"))
     occupancyGrid = visionsystem.generate_occupancy_grid()
     goal = visionsystem.get_goal_position() # slightly different than the default camera one
     robot = visionsystem.get_robot_position()  # slightly different than the default camera one
@@ -363,4 +365,4 @@ if __name__ == "__main__":
     waypoints = [
         np.array([100, 150, np.pi / 6]),  # x=100mm, y=150mm, direction=30° (π/6 radians)
     ]
-    plot_robot_grid(occupancyGrid, visionsystem.get_pixel_side_mm(), robot, robot, robot, goal, waypoints)
+    Visualisation.plot_robot_grid(occupancyGrid, visionsystem.get_pixel_side_mm(), robot, robot, robot, goal, waypoints)
