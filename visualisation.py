@@ -44,7 +44,7 @@ class Visualisation:
         """
         x, y, theta = position
         y = self.height * self.gridSquareSizeMM - y  # Adjust for top-left origin
-        self.ax.plot(x, y, 'o', color=color, label=label, origin='upper')
+        self.ax.plot(x, y, 'o', color=color, label=label)
         self.ax.arrow(x, y, np.cos(theta) * 10, np.sin(theta) * 10,
                       head_width=5, head_length=5, fc=color, ec=color)
 

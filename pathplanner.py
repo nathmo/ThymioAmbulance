@@ -121,8 +121,8 @@ class PathPlanner:
         """
         updated_waypoints = []
 
-        for i in range(len(waypoints) - 1):
-            updated_waypoints.append(np.array([waypoints[i][0]*self.pixel_size_mm, (waypoints[i][1])*self.pixel_size_mm]))
+        for i in range(len(waypoints)):
+            updated_waypoints.append(np.array([waypoints[i][0]*self.pixel_size_mm, (pixel_height-waypoints[i][1])*self.pixel_size_mm]))
 
         return updated_waypoints
 
@@ -248,9 +248,9 @@ class PathPlanner:
 
         # Run A* to find the path from start to target through the placed points
         waypoints = self.a_star(scaled_start, scaled_target, placed_points)
-        retour = []  # to see the point placed at random on the map instead of the waypoints :
-        for p in placed_points:
-           retour.append((p[0]*self.pixel_size_mm, p[1]*self.pixel_size_mm, 0))
+        #retour = []  # to see the point placed at random on the map instead of the waypoints :
+        #for p in placed_points:
+        #   retour.append((p[0]*self.pixel_size_mm, p[1]*self.pixel_size_mm, 0))
         #return retour
         waypoints = self.scale_and_flip_waypoints(waypoints, width, height)
         return waypoints # self.compute_angles_for_waypoints(waypoints)  # the angle are a bonus and simplify teh robot control.
