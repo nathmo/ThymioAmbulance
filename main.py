@@ -29,7 +29,7 @@ def main():
     #
     robot = RobotMovement(debug=False) # debug=True -> dont need robot for simulation
     robot.connect()
-    vision = VisionSystem(use_camera=False, cameraID=0, image_path=os.path.join("testData", "test.jpg"))
+    vision = VisionSystem(use_camera=False, cameraID=1, image_path=os.path.join("testData", "test.jpg"))
     sensorfusion = SensorFusion()
     pathplanner = PathPlanner(pixel_size_mm=vision.get_pixel_side_mm())
     # Start a separate thread for the update loop

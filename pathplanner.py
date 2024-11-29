@@ -253,7 +253,7 @@ class PathPlanner:
         #   retour.append((p[0]*self.pixel_size_mm, p[1]*self.pixel_size_mm, 0))
         #return retour
         waypoints = self.scale_and_flip_waypoints(waypoints, width, height)
-        return waypoints # self.compute_angles_for_waypoints(waypoints)  # the angle are a bonus and simplify teh robot control.
+        return self.compute_angles_for_waypoints(waypoints)  # the angle are a bonus and simplify teh robot control.
 
     def a_star(self, startpoint, goalpoint, available_nodes):
         """
