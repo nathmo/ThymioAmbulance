@@ -69,7 +69,6 @@ def main():
         #robot.set_position(robotPosFromFusion)
 
         # Update plot dynamically
-
         visualizer.update_plot(robotPosFromEncoder, robotPosFromCamera, robotPosFromFusion, goalPosFromCamera, waypoints)
 
         # Calculate the elapsed time and sleep for the remainder of the interval

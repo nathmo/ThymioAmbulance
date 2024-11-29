@@ -54,17 +54,22 @@ class Visualisation:
 
         # Clear current background
         self.ax.clear()
+
+        # Re-setup plot with new limits
         self._setup_plot()
 
-        # Overlay the occupancy grid with transparency
+        # Display the occupancy grid
         self.ax.imshow(occupancyGrid, cmap='gray_r', origin='upper',
                        extent=[0, self.width * self.gridSquareSizeMM,
                                0, self.height * self.gridSquareSizeMM], alpha=0.5)
 
-        # Display the OpenCV image with transparency
-        self.ax.imshow(cvImageRGB, extent=[0, self.width * self.gridSquareSizeMM,
-                                           0, self.height * self.gridSquareSizeMM], alpha=0.5)
+        # Overlay the OpenCV image with transparency
+        self.ax.imshow(cvImageRGB, origin='upper',
+                       extent=[0, self.width * self.gridSquareSizeMM,
+                               0, self.height * self.gridSquareSizeMM], alpha=0.5)
 
+        # Redraw canvas to force rendering
+        self.fig.canvas.draw_idle()
 
 
     def _plot_position(self, position, color, label):
