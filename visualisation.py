@@ -38,40 +38,6 @@ class Visualisation:
         self.ax.set_ylabel("Y position (mm)")
         self.ax.set_title("Occupancy Grid and Robot Positions")
 
-    def update_background(self, occupancyGrid, cvImage):
-        """
-        Update the background with an occupancy grid and an OpenCV image.
-        The image is displayed with transparency over the grid.
-        """
-        self.occupancyGrid = occupancyGrid
-        self.cvImage = cvImage
-
-        # Get dimensions from occupancy grid
-        self.height, self.width = occupancyGrid.shape
-
-        # Convert OpenCV image to RGB for matplotlib
-        cvImageRGB = cv2.cvtColor(cvImage, cv2.COLOR_BGR2RGB)
-
-        # Clear current background
-        self.ax.clear()
-
-        # Re-setup plot with new limits
-        self._setup_plot()
-
-        # Display the occupancy grid
-        self.ax.imshow(occupancyGrid, cmap='gray_r', origin='upper',
-                       extent=[0, self.width * self.gridSquareSizeMM,
-                               0, self.height * self.gridSquareSizeMM], alpha=0.5)
-
-        # Overlay the OpenCV image with transparency
-        self.ax.imshow(cvImageRGB, origin='upper',
-                       extent=[0, self.width * self.gridSquareSizeMM,
-                               0, self.height * self.gridSquareSizeMM], alpha=0.5)
-
-        # Redraw canvas to force rendering
-        self.fig.canvas.draw_idle()
-
-
     def _plot_position(self, position, color, label):
         """
         Plot a position with orientation on the grid.
@@ -82,16 +48,36 @@ class Visualisation:
         self.ax.arrow(x, y, np.cos(theta) * 10, np.sin(theta) * 10,
                       head_width=5, head_length=5, fc=color, ec=color)
 
-    def update_plot(self, robotPosFromEncoder, robotPosFromCamera,
-                    robotPosFromFusion, goalPosFromCamera, waypoints):
+    def update_plot(self, occupancyGrid, cvImage, robotPosFromEncoder,
+                    robotPosFromCamera, robotPosFromFusion,
+                    goalPosFromCamera, waypoints):
         """
-        Update the plot dynamically with the latest data and save it as a PNG.
+        Update the plot dynamically with the latest data, including the occupancy grid and camera image.
         """
-        # Clear the axis
-        self.ax.cla()  # Clears the current axis
+        self.occupancyGrid = occupancyGrid
+        self.cvImage = cvImage
 
-        # Re-setup the plot (otherwise, it will disappear after clearing)
+        # Get dimensions from occupancy grid
+        self.height, self.width = occupancyGrid.shape
+
+        # Convert OpenCV image to RGB for matplotlib
+        cvImageRGB = cv2.cvtColor(cvImage, cv2.COLOR_BGR2RGB)
+
+        # Clear the axis
+        self.ax.cla()
+
+        # Re-setup the plot
         self._setup_plot()
+
+        # Plot occupancy grid
+        self.ax.imshow(occupancyGrid, cmap='gray_r', origin='upper',
+                       extent=[0, self.width * self.gridSquareSizeMM,
+                               0, self.height * self.gridSquareSizeMM], alpha=0.5)
+
+        # Overlay OpenCV image
+        self.ax.imshow(cvImageRGB, origin='upper',
+                       extent=[0, self.width * self.gridSquareSizeMM,
+                               0, self.height * self.gridSquareSizeMM], alpha=0.5)
 
         # Plot robot positions and goal
         self._plot_position(robotPosFromEncoder, 'blue', 'Robot Encoder Position')
@@ -115,9 +101,6 @@ class Visualisation:
         timestamp = int(time.time())
         filename = f"liveVisu_{timestamp}.png"
         plt.savefig(os.path.join("result", filename))
-
-        # Optionally display the plot
-        # plt.show()  # Uncomment this if you want to display the plot interactively
 
     def import_matrix_from_txt(filename):
         """
