@@ -327,9 +327,9 @@ class PathPlanner:
 
 if __name__ == "__main__":
     # Load and process the occupancy grid
-    #path = os.path.join("testData", "mapWithBlackObstacle1.txt") #mapOneIsland2
-    #matrix = np.loadtxt(path, dtype=int)
-    #occupancyGrid = matrix.astype(bool)
+    path = os.path.join("testData", "mapWithBlackObstacle1.txt") #mapOneIsland2
+    matrix = np.loadtxt(path, dtype=int)
+    occupancyGrid = matrix.astype(bool)
     vision = VisionSystem(use_camera=False, image_path=os.path.join("testData", "test.jpg"))
     occupancyGrid = vision.generate_occupancy_grid()
     # Define the goal and robot states
