@@ -5,7 +5,7 @@ import time
 import os
 
 class VisionSystem:
-    def __init__(self, use_camera=False, image_path="testData\Image_iphone_path.png", checker_board_length=175):
+    def __init__(self, use_camera=False, cameraID=0, image_path="testData\Image_iphone_path.png", checker_board_length=175):
         # Charger le dictionnaire de marqueurs (DICT_6X6_250 contient 250 marqueurs uniques)
         self.aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_6X6_250)
         self.parameters = cv2.aruco.DetectorParameters()
@@ -25,7 +25,7 @@ class VisionSystem:
         self.aruco_target_id = 5
 
         self.debug = True
-        self.cameraID = 2
+        self.cameraID = cameraID
         #Function qui determine si on prend camera ou frame choisi
         if self.use_camera:
             print("Utilisation de la caméra")

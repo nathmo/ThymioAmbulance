@@ -137,7 +137,7 @@ class PathPlanner:
         if len(waypoints)>1:
             updated_waypoints = []
 
-            for i in range(len(waypoints) - 1):
+            for i in range(len(waypoints)-1):
                 # Current and next waypoints
                 current = waypoints[i]
                 next_wp = waypoints[i + 1]
@@ -229,6 +229,8 @@ class PathPlanner:
         # Start and target positions (manually added)
         scaled_start = tuple(start[:2]/self.pixel_size_mm)
         scaled_target = tuple(target[:2]/self.pixel_size_mm)
+        print("scaled_start" +str(scaled_start))
+        print("scaled_target" +str(scaled_target))
         placed_points.append(scaled_start)
         placed_points.append(scaled_target)
 
@@ -247,11 +249,11 @@ class PathPlanner:
         # Run A* to find the path from start to target through the placed points
         waypoints = self.a_star(scaled_start, scaled_target, placed_points)
         retour = []  # to see the point placed at random on the map instead of the waypoints :
-        #for p in placed_points:
-        #   retour.append((p[0]*self.pixel_size_mm, p[1]*self.pixel_size_mm, 0))
+        for p in placed_points:
+           retour.append((p[0]*self.pixel_size_mm, p[1]*self.pixel_size_mm, 0))
         #return retour
         waypoints = self.scale_and_flip_waypoints(waypoints, width, height)
-        return self.compute_angles_for_waypoints(waypoints)  # the angle are a bonus and simplify teh robot control.
+        return waypoints # self.compute_angles_for_waypoints(waypoints)  # the angle are a bonus and simplify teh robot control.
 
     def a_star(self, startpoint, goalpoint, available_nodes):
         """
@@ -325,14 +327,14 @@ class PathPlanner:
 
 if __name__ == "__main__":
     # Load and process the occupancy grid
-    path = os.path.join("testData", "mapWithBlackObstacle1.txt") #mapOneIsland2
-    matrix = np.loadtxt(path, dtype=int)
-    occupancyGrid = matrix.astype(bool)
-    vision = VisionSystem(use_camera=False, image_path=os.path.join("testData", "calibration_1732640447.png"))
+    #path = os.path.join("testData", "mapWithBlackObstacle1.txt") #mapOneIsland2
+    #matrix = np.loadtxt(path, dtype=int)
+    #occupancyGrid = matrix.astype(bool)
+    vision = VisionSystem(use_camera=False, image_path=os.path.join("testData", "test.jpg"))
     occupancyGrid = vision.generate_occupancy_grid()
     # Define the goal and robot states
-    goal = np.array([36, 294, np.pi / 6])  # slightly different than the default camera one
-    robot = np.array([463,382, np.pi / 6])  # slightly different than the default camera one
+    #goal = np.array([36, 294, np.pi / 6])  # slightly different than the default camera one
+    #robot = np.array([463,382, np.pi / 6])  # slightly different than the default camera one
     goal = vision.get_goal_position()
     robot = vision.get_robot_position()
     print("Robot:", robot)
@@ -342,7 +344,7 @@ if __name__ == "__main__":
     robotSpeedFromEncoder = np.array([0, 0, 0])  # no speed
 
     # Initialize the planner
-    planner = PathPlanner()
+    planner = PathPlanner(pixel_size_mm=vision.get_pixel_side_mm())
 
     # Time the waypoint calculation
     start_time = time.time()

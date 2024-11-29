@@ -27,9 +27,9 @@ def update_loop(robot):
 
 def main():
     #
-    robot = RobotMovement(debug=True) # debug=True -> dont need robot for simulation
+    robot = RobotMovement(debug=False) # debug=True -> dont need robot for simulation
     robot.connect()
-    vision = VisionSystem(use_camera=False, image_path=os.path.join("testData", "calibration_1732640447.png"))
+    vision = VisionSystem(use_camera=False, cameraID=0, image_path=os.path.join("testData", "test.jpg"))
     sensorfusion = SensorFusion()
     pathplanner = PathPlanner(pixel_size_mm=vision.get_pixel_side_mm())
     # Start a separate thread for the update loop
@@ -37,7 +37,9 @@ def main():
     update_thread.daemon = True  # Daemonize thread to exit when main program exits
     update_thread.start()
     visualizer = Visualisation(vision.get_pixel_side_mm())
-    visualizer.update_background(vision.generate_occupancy_grid(), vision.get_frame())
+    fameA = vision.generate_occupancy_grid()
+    fameB = vision.get_frame()
+    #visualizer.update_background(fameA, fameB)
     interval = 5  # 5000 ms interval (0.2 Hz)
 
     robotPosFromCamera = vision.get_robot_position()
@@ -69,8 +71,9 @@ def main():
         #robot.set_position(robotPosFromFusion)
 
         # Update plot dynamically
-        visualizer.update_plot(robotPosFromEncoder, robotPosFromCamera, robotPosFromFusion, goalPosFromCamera, waypoints)
-
+        visualizer.update_plot(fameA, fameB, robotPosFromEncoder, robotPosFromCamera, robotPosFromFusion, goalPosFromCamera, waypoints)
+        #visualizer.update_background(fameA, fameB)
+        
         # Calculate the elapsed time and sleep for the remainder of the interval
         elapsed_time = time.perf_counter() - start_time
         sleep_time = max(0, interval - elapsed_time)  # Ensure non-negative sleep time

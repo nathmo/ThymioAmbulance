@@ -141,7 +141,10 @@ class Visualisation:
 
         # Plot waypoints
         for idx, waypoint in enumerate(waypoints):
-            x, y, theta = waypoint
+            if len(waypoint)>2:
+                x, y, theta = waypoint
+            else:
+                x, y = waypoint
             ax.plot(x, y, 'x', color='orange')
             ax.annotate(f'WP{idx}', (x, y), textcoords="offset points", xytext=(5, 5), ha='center', color='orange')
 
