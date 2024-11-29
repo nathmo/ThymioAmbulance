@@ -202,7 +202,7 @@ class RobotMovement:
     def __init__(self, debug = False):
         # Connect to the robot using tdmclient
         if not debug:
-            self.client = ClientAsync(tdm_addr = "172.18.128.1")
+            self.client = ClientAsync() #tdm_addr = "172.18.128.1"
             #self.client.tdm_port = 
         else:
             self.client = None
