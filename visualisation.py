@@ -72,12 +72,12 @@ class Visualisation:
         # Plot occupancy grid
         self.ax.imshow(occupancyGrid, cmap='gray_r', origin='upper',
                        extent=[0, self.width * self.gridSquareSizeMM,
-                               0, self.height * self.gridSquareSizeMM], alpha=0.5)
+                               0, self.height * self.gridSquareSizeMM], alpha=0.2)
 
         # Overlay OpenCV image
         self.ax.imshow(cvImageRGB, origin='upper',
                        extent=[0, self.width * self.gridSquareSizeMM,
-                               0, self.height * self.gridSquareSizeMM], alpha=0.5)
+                               0, self.height * self.gridSquareSizeMM], alpha=0.8)
 
         # Plot robot positions and goal
         self._plot_position(robotPosFromEncoder, 'blue', 'Robot Encoder Position')

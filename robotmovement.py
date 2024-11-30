@@ -2,6 +2,11 @@ import numpy as np
 from threading import Lock
 from tdmclient import ClientAsync, aw, thymio
 import time
+from visionsystem import VisionSystem
+from sensorfusion import SensorFusion
+from pathplanner import PathPlanner
+from visualisation import Visualisation
+import os
 
 '''
 This is the list of property avaible on the node oject. some are function, some are variable. None are documented in a
@@ -215,8 +220,8 @@ class RobotMovement:
         self.last_update_time = time.time()
         self.total_elapsed_time = 0
         self.update_count = 0
-        self.tolerance_radian = 0.25
-        self.tolerance_mm = 10
+        self.tolerance_radian = 0.6
+        self.tolerance_mm = 50
         self.min_agular_speed = 0.5
         self.max_agular_speed = 4.5
         self.min_linear_speed = 10
@@ -314,12 +319,16 @@ class RobotMovement:
             angle_to_target = -np.arctan2(delta[1], delta[0])
             angle_diff = angle_to_target - self.position[2]
             distance_vector = delta[:2]
-            if(abs(angle_diff)<np.pi):
-                distance = np.linalg.norm(distance_vector)
-            else:
-                distance = -np.linalg.norm(distance_vector)
 
-            if not (int(self.update_count) % max(10, int(1/(min(1, average_elapsed_time))))) :
+            distance = np.linalg.norm(distance_vector)
+
+            # Normalize angle_diff to [-pi, pi]
+            angle_diff = (angle_diff + np.pi) % (2 * np.pi) - np.pi
+
+
+            # This work as a P controller by ajusting speed as a function of the distance/angle left to reach the waypoint
+            # speed (linear or angular are capped between two limit value)
+            if not (int(self.update_count) % max(2 , int(1/(min(1, average_elapsed_time))))) :
                 print("-------------------------------------------")
                 print("speed "+str(self.get_speed()))
                 print("position "+str(position))
@@ -330,17 +339,6 @@ class RobotMovement:
                 print("time elapsed since last print "+str(10*average_elapsed_time))
                 print("total run time " + str(self.update_count * average_elapsed_time))
                 print("waypoints left to reach : " + str(len(self.get_waypoints())))
-            # Normalize angle_diff to [-pi, pi]
-            angle_diff = (angle_diff + np.pi) % (2 * np.pi) - np.pi
-
-            # Check for overshooting: angle difference around ±180° indicates overshoot
-            if abs(angle_diff) > np.pi / 2:
-                distance = -distance  # Negative distance if overshot
-
-
-
-            # This work as a P controller by ajusting speed as a function of the distance/angle left to reach the waypoint
-            # speed (linear or angular are capped between two limit value)
 
             if abs(angle_diff) > self.tolerance_radian:  # Angular adjustment
                 min_time = max(3 * average_elapsed_time, 1.0)  # Ensure min_time is at least 1 second
@@ -351,7 +349,7 @@ class RobotMovement:
                 angular_speed = round(angular_speed, 1)*signe
                 self.set_speed(np.array([0.0, 0.0, angular_speed]))
                 self.set_angular_speed(angular_speed)
-            elif abs(distance) > self.tolerance_mm :  # Forward adjustment
+            elif distance > self.tolerance_mm :  # Forward adjustment
                 min_time = max(10 * average_elapsed_time, 1.0)  # Ensure min_time is at least 1 second
                 forward_speed = distance / min_time
                 forward_speed = max(self.min_linear_speed, abs(forward_speed))  # Ensure minimum forward speed of 10 mm/s
@@ -365,6 +363,8 @@ class RobotMovement:
                 self.set_straight_speed(forward_speed)
             else:
                 # Reached waypoint, update to the next
+                self.set_speed(np.array([0.0, 0.0, 0.0]))
+                self.set_straight_speed(0)
                 self.set_waypoints(waypoints[1:])
                 print("Waypoint reached")
 
@@ -558,19 +558,23 @@ class RobotMovement:
 
 
 if __name__ == "__main__":
-    robot = RobotMovement()
+    robot = RobotMovement(debug=False) # debug=True -> dont need robot for simulation
     robot.connect()
-    print("setting waypoints")
-    robot.set_straight_speed(0.0)
-    #robot.set_position(np.array([0.0, 0.0, 0.0]))
-    #robot.set_waypoints([np.array([100.0, 0.0, 0.0]), np.array([100.0, 100.0, 0.0]), np.array([0.0, 100.0, 0.0]), np.array([0.0, 0.0, 0.0])])
-    robot.set_waypoints([np.array([1446.51550293,  379.81130981,   -3.08813006]), np.array([1144.,  396.,   -2.57392623]), np.array([868., 572.,  -2.39415094]), np.array([540., 876.,  -1.17055567]), np.array([ 5.84000000e+02,  9.80000000e+02, -9.63491102e-01]), np.array([ 7.48000000e+02,  1.21600000e+03, -8.15691923e-01]), np.array([ 9.40000000e+02,  1.42000000e+03, -2.75805899e-01]), np.array([1.15200000e+03, 1.48000000e+03, 5.72218689e-01]), np.array([1.38590723e+03, 1.32933960e+03, 5.72218689e-01])])
-    robot.set_position(np.array([1446.51550293,  379.81130981,   -3.08813006]))
-    #robot.set_angular_speed(1)
-    #time.sleep(np.pi)
-    #robot.set_angular_speed(0.0)
-    print("done setting waypoints")
-    i=10
+    vision = VisionSystem(use_camera=True, cameraID=1, image_path=os.path.join("testData", "test.jpg"))
+    sensorfusion = SensorFusion()
+
+    visualizer = Visualisation(vision.get_pixel_side_mm())
+    fameA = vision.generate_occupancy_grid()
+    fameB = vision.get_frame()
+
+    robotPosFromCamera = vision.get_robot_position()
+    goalPosFromCamera = vision.get_goal_position()
+    print("robotPosFromCamera " + str(robotPosFromCamera))
+    print("goalPosFromCamera "+str(goalPosFromCamera))
+    waypoints = [np.array([800.0, 800.0, 0.0]), np.array([800.0, 1000.0, 0.0])]
+    robot.set_waypoints(waypoints)
+    robot.set_position(robotPosFromCamera)
+
     while True:
         start_time = time.time()  # Record the start time
         #print(robot.get_proximity_ir_sensor())
@@ -581,6 +585,12 @@ if __name__ == "__main__":
         #robot.set_straight_speed(i)
         #time.sleep(0.5)
         robot.update()
+        robotPosFromCamera = vision.get_robot_position()
+        goalPosFromCamera = vision.get_goal_position()
+        robotPosFromEncoder = robot.get_position()
+        robotSpeedFromEncoder = robot.get_speed()
+        robotPosFromFusion = sensorfusion.get_estimated_position(robotPosFromEncoder, robotSpeedFromEncoder, robotPosFromCamera)
+        visualizer.update_plot(fameA, fameB, robotPosFromEncoder, robotPosFromCamera, robotPosFromFusion, goalPosFromCamera, waypoints)
         #print("waypoints left to reach : "+str(len(robot.get_waypoints())))
         #i=i+1
         #print(i)
