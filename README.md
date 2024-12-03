@@ -3,15 +3,15 @@ This repo contains code and documentation to control the thymio from a laptop us
 a ceiling mounted camera to navigate a labyrinthe
 
 # Lore
-pompier/ambulance -> thymio 
-- evite voiture sur la route
+Pompier/ambulance -> thymio 
+- évite voiture sur la route
 - GPS (camera)
-- connais les route (obsctacle vu par la camera unlike voiture)
+- Connaitre les routes (obsctacle vu par la camera unlike voiture)
 va chercher le patient ASAP 
 
-position de marker avec une camera
-path finding(astar)
-localisation bruité avec kalman
+Position de marker avec une camera
+Path finding(astar)
+Localisation bruité avec kalman
 
 # Architecture
 Main loop :
