@@ -1,81 +1,602 @@
 import numpy as np
 from threading import Lock
-import math
+from tdmclient import ClientAsync, aw, thymio
+import time
+from visionsystem import VisionSystem
+from sensorfusion import SensorFusion
+from pathplanner import PathPlanner
+from visualisation import Visualisation
+import os
 
-# Constants
-BASICSPEED = 100
-GAIN = 10
-ANGULAR_GAIN = 15
+'''
+This is the list of property avaible on the node oject. some are function, some are variable. None are documented in a
+clear and consistend maneer. Good luck...
+
+print(dir(self.node))
+['__class__', 
+'__contains__', 
+'__delattr__', 
+'__dict__', 
+'__dir__', 
+'__doc__', 
+'__enter__', 
+'__eq__', 
+'__exit__', 
+'__format__', 
+'__ge__', 
+'__getattribute__', 
+'__getitem__', 
+'__gt__', 
+'__hash__', 
+'__init__', 
+'__init_subclass__', 
+'__le__', 
+'__lt__', 
+'__module__', 
+'__ne__', 
+'__new__', 
+'__reduce__', 
+'__reduce_ex__', 
+'__repr__',
+'__setattr__',
+'__setitem__', 
+'__sizeof__', 
+'__str__', 
+'__subclasshook__', 
+'__weakref__', 
+'add_event_received_listener', 
+'add_events_received_listener', 
+'add_variables_changed_listener', 
+'add_vm_state_changed_listener', 
+'clear_event_received_listeners', 
+'clear_events_received_listeners', 
+'clear_variables_changed_listeners', 
+'clear_vm_state_changed_listener', 
+'compile', 
+'create_msg_lock_node', 
+'create_msg_program', 
+'create_msg_register_events', 
+'create_msg_rename_node', 
+'create_msg_request_vm_description', 
+'create_msg_scratchpad_update', 
+'create_msg_send_events', 
+'create_msg_set_variables', 
+'create_msg_set_vm_execution_state', 
+'create_msg_unlock_node', 
+'create_msg_watch_node', 
+'event_description', 
+'filter_out_vm_events', 
+'flash', 
+'flush', 
+'function_description', 
+'get_vm_description', 
+'id', 
+'id_str', 
+'lock', 
+'lock_node', 
+'mark_change', 
+'notify_events_received', 
+'notify_variables_changed',
+'notify_vm_state_changed', 
+'on_event_received',
+'on_events_received', 
+'on_variables_changed', 
+'on_vm_state_changed', 
+'props', 
+'register_events', 
+'remove_event_received_listener', 
+'remove_events_received_listener', 
+'remove_variables_changed_listener', 
+'remove_vm_state_changed_listener', 
+'rename', 
+'run', 
+'send_events', 
+'send_lock_node', 
+'send_program', 
+'send_register_events', 
+'send_rename_node', 
+'send_request_vm_description', 
+'send_send_events', 
+'send_set_scratchpad', 
+'send_set_variables', 
+'send_unlock_node',
+'set_properties', 
+'set_scratchpad', 
+'set_variables', 
+'set_vm_execution_state', 
+'status', 
+'stop', 
+'thymio', 
+'unlock', 
+'unwatch', 
+'v',                        -> this is the object that contains the cached variable
+'var',                      -> return an empty list
+'var_description',          -> return the list of every variable  (see further down)
+'var_to_send', 
+'vm_description', 
+'wait_for_variables', 
+'watch', 
+'watch_flags', 
+'watch_node']
+
+
+print(self.node.props)  # 
+{'node_id': b'O\xef\xd1\xe0\x979D\xcc\xb11\x04\x01\xb8#T\xab',
+'node_id_str': '4fefd1e0-9739-44cc-b131-0401b82354ab', 
+'group_id': b'\xdf$\xec\x96\x17\xafB"\x9f\xd1c\xa9j4~Q', 
+'group_id_str': 'df24ec96-17af-4222-9fd1-63a96a347e51', 
+'status': 2, 
+'type': -1, 
+'name': 'Thymio-II', 
+'capabilities': 7, 
+'fw_version': '14'}
+
+list of robot variable : 
+
+robot_variables = list(aw(self.node.var_description()))
+print(robot_variables)
+            
+['_id', 
+'event.source', 
+'event.args', 
+'_fwversion', 
+'_productId', 
+'buttons._raw', 
+'button.backward',  -> 0, no contact, 1= touched, (int) 
+'button.left',      -> 0, no contact, 1= touched, (int) 
+'button.center',    -> 0, no contact, 1= touched, (int) 
+'button.forward',   -> 0, no contact, 1= touched, (int) 
+'button.right',     -> 0, no contact, 1= touched, (int) 
+'buttons._mean',  
+'buttons._noise', 
+'prox.horizontal',     -> a list of 7 value from 0 (nothing dected) to 4096 (very close to obstacle), index 0 is front_left, then, front_center_left, front_center, front_center_right, front_right, rear_left, rear_right (index 6)
+'prox.comm.rx._payloads', 
+'prox.comm.rx._intensities', 
+'prox.comm.rx', 
+'prox.comm.tx', 
+'prox.ground.ambiant', 
+'prox.ground.reflected', 
+'prox.ground.delta', 
+'motor.left.target',     -> Theses two are the only properties that can be set to change the speed
+'motor.right.target',    -> Theses two are the only properties that can be set to change the speed
+'_vbat', 
+'_imot', 
+'motor.left.speed', 
+'motor.right.speed', 
+'motor.left.pwm', 
+'motor.right.pwm', 
+'_integrator', 
+'acc', 
+'leds.top', 
+'leds.bottom.left', 
+'leds.bottom.right', 
+'leds.circle', 
+'temperature',          -> the unit. it increase when hotter. 309 at ambient temp, 328 after blowing hot humid air inside
+'rc5.address', 
+'rc5.command', 
+'mic.intensity', 
+'mic.threshold', 
+'mic._mean', 
+'timer.period', 
+'acc._tap', 
+'sd.present']
+
+theses value can be modified using :
+
+BEWARE : IT IS NOT RESPONSIVE. EXPECTE up to 1 sec to apply the command.
+
+aw(self.node.lock())  # Acquire lock explicitly
+aw(self.client.wait_for_status(self.client.NODE_STATUS_READY))
+v = {
+    "motor.left.target": [speed],
+    "motor.right.target": [speed],
+}
+aw(self.node.set_variables(v))
+aw(self.node.unlock())  # Release lock
+                       
+To read the value : 
+
+self.node.lock()
+self.client.aw(self.node.wait_for_variables())
+temperature = self.node.v.temperature
+self.node.unlock() 
+
+'''
 
 class RobotMovement:
-    def _init_(self):
-        # Initialize motors, sensors, and encoders
-        self.waypoints = [np.array([0, 0, 0])]  # list of np.array for waypoints
-        self.position = np.array([0, 0, 0])     # Current position of the robot
-        self.speed = np.array([0, 0, 0])        # Current speed of the robot
+    def __init__(self, debug = False):
+        # Connect to the robot using tdmclient
+        if not debug:
+            self.client = ClientAsync() #tdm_addr = "172.18.128.1"
+            #self.client.tdm_port = 
+        else:
+            self.client = None
+        self.node = None
+        self.debug = debug
+        self.waypoints = [np.array([0.0, 0.0, 0.0])]  # List of np.array for waypoints , (a list of numpy array coded like position)
+        self.position = np.array([0.0, 0.0, 0.0])  # Current position of the robot (x [mm], y[mm], angle with the x/horizontal axis in radian (clockwise rotation is positive))
+        self.speed = np.array([0.0, 0.0, 0.0])  # Current speed of the robot (same format as position but per second)
         self._lock = Lock()  # Mutex lock for thread safety
+        self.last_update_time = time.time()
+        self.total_elapsed_time = 0
+        self.update_count = 0
+        self.tolerance_radian = 0.6
+        self.tolerance_mm = 50
+        self.min_agular_speed = 0.5
+        self.max_agular_speed = 4.5
+        self.min_linear_speed = 10
+        self.max_linear_speed = 100
+        self.proximity_threshold = 1000
+
+    def __del__(self):
+        # Ensure the node is unlocked before the instance is destroyed
+        if self.node is not None:
+            try:
+                self.set_straight_speed(0)
+                aw(self.node.unlock())
+                print("Robot unlocked successfully.")
+            except Exception as e:
+                print(f"Error unlocking the robot: {e}")
+
+    def connect(self):
+        if not self.debug:
+            print("IP address "+str(self.client.tdm_addr))
+            print("Port "+str(self.client.tdm_port))
+            self.node = aw(self.client.wait_for_node())
+            aw(self.node.lock())
+            aw(self.client.wait_for_status(self.client.NODE_STATUS_READY))
 
     def set_waypoints(self, waypoints):
-        # Update the global list of waypoints to follow (requires mutex for thread safety)
         with self._lock:
             self.waypoints = waypoints
 
     def get_waypoints(self):
-        # Return the global list of waypoints to follow minus those already reached
-        # Requires mutex to ensure thread-safe access
         with self._lock:
-            # Example waypoints, replace with the actual dynamic waypoint list as needed
-            # waypoints = [
-            #     np.array([100, 150, np.pi / 6]),  # x=100mm, y=150mm, direction=30° (π/6 radians)
-            #     np.array([200, 250, np.pi / 3]),  # x=200mm, y=250mm, direction=60° (π/3 radians)
-            #     np.array([300, 350, np.pi / 2])   # x=300mm, y=350mm, direction=90° (π/2 radians)
-            # ]
-            if ((abs(self.waypoints[0] - self.position)) < 50):
-                self.waypoints.pop(0)
             return self.waypoints
 
     def get_position(self):
-        # Return the robot's estimated position from encoders
-        # Requires mutex for thread-safe access
         with self._lock:
             return self.position
 
     def set_position(self, kalman_position):
-        # Update the robot’s position based on Kalman filter results
-        # Requires mutex for thread-safe update
         with self._lock:
-            self.position = (self.position + kalman_position)/2
+            self.position = (kalman_position)
 
     def get_speed(self):
-        # Return the robot's speed and angular speed from encoders
-        # Requires mutex for thread-safe access
         with self._lock:
-            return self.speed #np.array([10, 15, np.pi / 60])  # Example: x=10mm/s, y=15mm/s, rotation=π/60 radians/s
+            return self.speed
+
+    def set_speed(self, speed):
+        with self._lock:
+            self.speed = speed
 
     def update(self):
-        # Called every 10 ms to perform necessary tasks
-        # (e.g., avoid obstacles, move to the nearest waypoint)
-        # Requires mutex for any shared resource modification
-        with self._lock:
-            # Implement movement, obstacle avoidance, etc.
-            goal_x, goal_y, goal_theta = self.waypoints[0]
-            x, y, theta = self.position
+        current_time = time.time()
 
-            distance = math.sqrt((goal_x - x) ** 2 + (goal_y - y) ** 2)
-            desired_angle = math.atan2(goal_y - y, goal_x - x)
-            heading_error = desired_angle - theta
-            heading_error = (heading_error + math.pi) % (2 * math.pi) - math.pi
+        elapsed_time = current_time - self.last_update_time
+        self.last_update_time = current_time
+
+        # Update average elapsed time
+        self.total_elapsed_time += elapsed_time
+        self.update_count += 1
+        average_elapsed_time = self.total_elapsed_time / self.update_count
+
+        # Increment position by speed * elapsed_time
+        speed = self.get_speed()
+        position = self.get_position()
+        position += speed * elapsed_time # integrate position from speed over time
+        self.set_position(position)
+        waypoints = self.get_waypoints()
 
 
-            diff = heading_error * ANGULAR_GAIN
-            motor_left_target = BASICSPEED - diff*GAIN
-            motor_right_target = BASICSPEED + diff*GAIN
+        ir_sensors = self.get_proximity_ir_sensor()
+        if ir_sensors["front_center"] > self.proximity_threshold:
+            unit_normal = np.array([np.sin(-position[2]), np.cos(-position[2]), 0])
+            waypoints.insert(0, position + unit_normal * 100)
+            self.set_waypoints(waypoints)  # add a new waypoint away from obstacle
+        elif ir_sensors["front_left"] > self.proximity_threshold:
+            unit_normal = np.array([np.sin(-position[2]), np.cos(-position[2]), 0])
+            waypoints.insert(0, position - unit_normal * 100)  # BEWARE, sign reversed
+            self.set_waypoints(waypoints)  # add a new waypoint away from obstacle
+        elif ir_sensors["front_center_left"] > self.proximity_threshold:
+            unit_normal = np.array([np.sin(-position[2]), np.cos(-position[2]), 0])
+            waypoints.insert(0, position - unit_normal * 100)  # BEWARE, sign reversed
+            self.set_waypoints(waypoints)  # add a new waypoint away from obstacle
+        elif ir_sensors["front_right"] > self.proximity_threshold:
+            unit_normal = np.array([np.sin(-position[2]), np.cos(-position[2]), 0])
+            waypoints.insert(0, position + unit_normal * 100)
+            self.set_waypoints(waypoints)  # add a new waypoint away from obstacle
+        elif ir_sensors["front_center_right"] > self.proximity_threshold:
+            unit_normal = np.array([np.sin(-position[2]), np.cos(-position[2]), 0])
+            waypoints.insert(0, position + unit_normal * 100)
+            self.set_waypoints(waypoints)  # add a new waypoint away from obstacle
 
-            self.speed = np.array([motor_left_target, motor_right_target, heading_error])
+        if waypoints:
+            next_waypoint = waypoints[0]
+            delta = next_waypoint - self.position
 
-            if ((abs(self.waypoints[0] - self.position)) < 50):
-                self.waypoints.pop(0)
+            # Compute signed distance and angular difference
+            angle_to_target = -np.arctan2(delta[1], delta[0])
+            angle_diff = angle_to_target - self.position[2]
+            distance_vector = delta[:2]
 
-            # Update the robot's position based on the Kalman Filter (Ask how to gain access to it)
-            # Obstacle Avoidance is taken into consideration in pathplanner.py, so it should be taken into consideration in
-            # the list of waypoints that are passed to the robot movement class
+            distance = np.linalg.norm(distance_vector)
+
+            # Normalize angle_diff to [-pi, pi]
+            angle_diff = (angle_diff + np.pi) % (2 * np.pi) - np.pi
+
+
+            # This work as a P controller by ajusting speed as a function of the distance/angle left to reach the waypoint
+            # speed (linear or angular are capped between two limit value)
+            if not (int(self.update_count) % max(2 , int(1/(min(1, average_elapsed_time))))) :
+                print("-------------------------------------------")
+                print("speed "+str(self.get_speed()))
+                print("position "+str(position))
+                print("target " + str(next_waypoint))
+                print("Distance to target : "+str(distance))
+                print("angle to target : " + str(angle_diff))
+                print("average elapsed time per robot update cycle "+str(average_elapsed_time))
+                print("time elapsed since last print "+str(10*average_elapsed_time))
+                print("total run time " + str(self.update_count * average_elapsed_time))
+                print("waypoints left to reach : " + str(len(self.get_waypoints())))
+
+            if abs(angle_diff) > self.tolerance_radian:  # Angular adjustment
+                min_time = max(3 * average_elapsed_time, 1.0)  # Ensure min_time is at least 1 second
+                angular_speed = angle_diff / min_time
+                signe = np.sign(angular_speed)
+                angular_speed = max(self.min_agular_speed, abs(angular_speed))  # Ensure minimum angular speed of +/-0.5 rad/s
+                angular_speed = min(self.max_agular_speed, abs(angular_speed))  # Ensure maximum angular speed of +/-4.5 rad/s
+                angular_speed = round(angular_speed, 1)*signe
+                self.set_speed(np.array([0.0, 0.0, angular_speed]))
+                self.set_angular_speed(angular_speed)
+            elif distance > self.tolerance_mm :  # Forward adjustment
+                min_time = max(10 * average_elapsed_time, 1.0)  # Ensure min_time is at least 1 second
+                forward_speed = distance / min_time
+                forward_speed = max(self.min_linear_speed, abs(forward_speed))  # Ensure minimum forward speed of 10 mm/s
+                forward_speed = min(self.max_linear_speed, abs(forward_speed))  # Ensure maximum forward speed of 100 mm/s
+                forward_speed = round(forward_speed, 0) # the motor speed use a int
+                theta = position[2]  # Angle (in radians) from the x-axis
+                vx = forward_speed * np.cos(-theta)  # Project forward speed onto the x-axis
+                vy = forward_speed * np.sin(-theta)  # Project forward speed onto the y-axis
+                # Set the projected speed
+                self.set_speed(np.array([vx, vy, 0.0]))
+                self.set_straight_speed(forward_speed)
+            else:
+                # Reached waypoint, update to the next
+                self.set_speed(np.array([0.0, 0.0, 0.0]))
+                self.set_straight_speed(0)
+                self.set_waypoints(waypoints[1:])
+                print("Waypoint reached")
+
+        else:
+            self.set_speed(np.array([0.0, 0.0, 0.0]))
+            self.set_straight_speed(0.0)
+            if not (int(self.update_count) % max(5, int(1 / (min(1, average_elapsed_time))))):
+                print("no more waypoints")
+
+    def mm_per_second_to_arbitrary_unit(self, v, k=0.39, c=0.409):
+        """
+        Convert speed in mm/s to the arbitrary motor unit using a linear model.
+        :param v: Speed in mm/s
+        :param k: Slope (conversion factor) in mm/s per arbitrary unit (default: 0.39) (computed from measurement)
+        :param c: Offset (constant) in mm/s (default: 0.409) (computed from measurement)
+        :return: Speed in arbitrary motor units
+
+        Measurements made :
+        44 mm in 10 sec @ speed = 10
+        80 mm in 10 sec @ speed = 20
+        120 mm in 10 sec @ speed = 30
+        155 mm in 10 sec @ speed = 40
+        200 mm in 10 sec @ speed = 50
+
+        230 mm in 10 sec @ speed = 60
+        260 mm in 10 sec @ speed = 70
+        290 mm in 10 sec @ speed = 80
+        330 mm in 10 sec @ speed = 90
+        365 mm in 10 sec @ speed = 100
+
+-
+        88 mm in 20 sec @ speed = 10
+        160 mm in 20 sec @ speed = 20
+        228 mm in 20 sec @ speed = 30
+        305 mm in 20 sec @ speed = 40
+        385 mm in 20 sec @ speed = 50
+
+        88 mm in 20 sec @ speed = 10 LOADED (1kg)
+
+        From these data we find 0.39 mm/s for each arbitrary speed unit + 0.409 mm/s (offset) (valid in the 10-100 range)
+        """
+        # Ensure the speed is greater than the offset for valid conversion, otherwise set the speed to 0
+        if abs(v) < c:
+            return 0
+        # Perform the conversion
+        S = (abs(v) - c) / k
+        return int(S*(1 if v >= 0 else -1))
+
+    def set_motor_speed(self, speed_left, speed_right):
+        """
+        Set the speed of each wheel of the robot.
+        :param speed: Integer speed value (in mm/s) [-100:-10] OR [10:100] Negative values move backward for each motor.
+        it might work outside theses value but you will see that the conversion is not as precise.
+        this function take about 0.1 second
+        """
+
+        if self.node is not None:
+            v = {
+                "motor.left.target": [self.mm_per_second_to_arbitrary_unit(speed_left)],
+                "motor.right.target": [self.mm_per_second_to_arbitrary_unit(speed_right)],
+            }
+            aw(self.node.set_variables(v))
+        else:
+            if not self.debug:
+                print("robot not connected")
+
+    def set_straight_speed(self, speed):
+        """
+        Set the speed of the robot.
+        :param speed: Integer speed value (in mm/s) [-100:-10] OR [10:100] Negative values move backward.
+        it might work outside theses value but you will see that the conversion is not as precise
+        and at some point the robot cant keep up.
+        """
+        self.set_motor_speed(speed, speed)
+
+    def set_angular_speed(self, angular_speed):
+        """
+        Turn the robot on the spot by a given angle.
+        :param angle: Angle in radians/per second (positive = clockwise rotation).
+                between [-4.5,-0.45] AND [0.45, 4.5] radian/s
+
+        the wheel are spaced 95 mm from each other, 47.5mm radius
+        for a full turn, each wheel travel along a perimeter of 298.45 mm
+        assuming max speed of 100 mm/s for precision, thats 1.5 sec for a full 180° /pi radian
+
+        (was manually adapted to 43 mm since the 47.5mm radius was not producing accurate rotation)
+        """
+        motor_speed = self.mm_per_second_to_arbitrary_unit(angular_speed*43/(2))
+        self.set_motor_speed(motor_speed, -motor_speed)
+
+    def get_temperature(self):
+        """
+        return the temperature in an arbitrary unit (or in kelvin and really off by 10-20 K)
+        """
+        if self.node is not None:
+            #aw(self.node.lock())
+            aw(self.client.wait_for_status(self.client.NODE_STATUS_READY))
+            self.client.aw(self.node.wait_for_variables())
+            temperature = self.node.v.temperature
+            #aw(self.node.unlock())
+            return temperature
+        else:
+            print("robot not connected")
+
+    def get_proximity_ir_sensor(self):
+        """
+        return a dictionary with the following key :
+        the greater the value (0-4096) the closer the obstacle
+        """
+
+        if self.node is not None:
+            aw(self.client.wait_for_status(self.client.NODE_STATUS_READY))
+            self.client.aw(self.node.wait_for_variables({"prox.horizontal"}))
+            sensor = self.node.v.prox.horizontal
+            sensorDict = {
+                "rear_right":sensor[6],
+                "rear_left": sensor[5],
+                "front_left": sensor[0],
+                "front_center_left": sensor[1],
+                "front_center": sensor[2],
+                "front_center_right": sensor[3],
+                "front_right": sensor[4],
+            }
+            return sensorDict
+        else:
+            if not self.debug:
+                print("robot not connected")
+            else :
+                sensorDict = {
+                    "rear_right": 0,
+                    "rear_left": 0,
+                    "front_left": 0,
+                    "front_center_left": 0,
+                    "front_center": 0,
+                    "front_center_right": 0,
+                    "front_right": 0,
+                }
+                return sensorDict
+
+    def get_button_pressed(self):
+        """
+        return a dictionary with the following key :
+        the greater the value (0-4096) the closer the obstacle
+        (the button left and right are defined when you look at the robot with the robot pointing aheaf of you.
+        """
+
+        if self.node is not None:
+            aw(self.client.wait_for_status(self.client.NODE_STATUS_READY))
+            self.client.aw(self.node.wait_for_variables({"button.backward", "button.left", "button.right", "button.forward", "button.center"}))
+            buttonDict = {
+                "backward":self.node.v.button.backward,
+                "left": self.node.v.button.left,
+                "center": self.node.v.button.center,
+                "forward": self.node.v.button.forward,
+                "right": self.node.v.button.right,
+            }
+            return buttonDict
+        else:
+            if not self.debug:
+                print("robot not connected")
+            else:
+                buttonDict = {
+                    "backward": 0,
+                    "left": 0,
+                    "center": 0,
+                    "forward": 0,
+                    "right": 0,
+                }
+                return buttonDict
+
+    def get_all_variable(self):
+        if self.node is not None:
+            #aw(self.node.lock())
+            aw(self.client.wait_for_status(self.client.NODE_STATUS_READY))
+            self.client.aw(self.node.wait_for_variables())
+            # Get all attributes of node.v
+            variables = dir(self.node.v)
+
+            # Filter out private attributes and methods
+            variable_names = list(aw(self.node.var_description()))
+
+            # Retrieve each variable's value
+            variable_values = {var: getattr(self.node.v, var) for var in variable_names}
+
+            for i in self.node.v.prox.horizontal:
+                print(i)
+            #aw(self.node.unlock())
+            return variable_values
+        else:
+            print("robot not connected")
+
+
+if __name__ == "__main__":
+    robot = RobotMovement(debug=False) # debug=True -> dont need robot for simulation
+    robot.connect()
+    vision = VisionSystem(use_camera=True, cameraID=1, image_path=os.path.join("testData", "test.jpg"))
+    sensorfusion = SensorFusion()
+
+    visualizer = Visualisation(vision.get_pixel_side_mm())
+    fameA = vision.generate_occupancy_grid()
+    fameB = vision.get_frame()
+
+    robotPosFromCamera = vision.get_robot_position()
+    goalPosFromCamera = vision.get_goal_position()
+    print("robotPosFromCamera " + str(robotPosFromCamera))
+    print("goalPosFromCamera "+str(goalPosFromCamera))
+    waypoints = [np.array([800.0, 800.0, 0.0]), np.array([800.0, 1000.0, 0.0])]
+    robot.set_waypoints(waypoints)
+    robot.set_position(robotPosFromCamera)
+
+    while True:
+        start_time = time.time()  # Record the start time
+        #print(robot.get_proximity_ir_sensor())
+        #print(robot.get_all_variable())
+        #print(robot.get_temperature())
+        #print(robot.get_button_pressed())
+        #i=-i
+        #robot.set_straight_speed(i)
+        #time.sleep(0.5)
+        robot.update()
+        robotPosFromCamera = vision.get_robot_position()
+        goalPosFromCamera = vision.get_goal_position()
+        robotPosFromEncoder = robot.get_position()
+        robotSpeedFromEncoder = robot.get_speed()
+        robotPosFromFusion = sensorfusion.get_estimated_position(robotPosFromEncoder, robotSpeedFromEncoder, robotPosFromCamera)
+        visualizer.update_plot(fameA, fameB, robotPosFromEncoder, robotPosFromCamera, robotPosFromFusion, goalPosFromCamera, waypoints)
+        #print("waypoints left to reach : "+str(len(robot.get_waypoints())))
+        #i=i+1
+        #print(i)
+        #robot.set_straight_speed(i)
+        end_time = time.time()  # Record the end time
+        # Calculate and print the execution time
+        execution_time = end_time - start_time
+        #print(f"Execution time: {execution_time:.6f} seconds")
+

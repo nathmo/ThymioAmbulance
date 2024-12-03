@@ -1,4 +1,3 @@
-from filterpy.kalman import KalmanFilter
 import numpy as np
 import time
 import matplotlib.pyplot as plt
@@ -56,8 +55,10 @@ class SensorFusion:
 
     def get_estimated_position(self, encoder_position, encoder_speed, camera_position, delta_t=1.0,
                                measurement_noise=1.0):
+        if camera_position is None:
+            camera_position = np.array([0, 0, 0])
         # Update x filter
-        if self.is_valid(camera_position[0]) and self.is_valid(encoder_position[0], min_val=0):
+        if self.is_valid(camera_position[0]) and self.is_valid(encoder_position[0]):
             # If both the camera and encoder values are valid, use the average
             updated_position = (camera_position[0] + encoder_position[0]) / 2
             self.x_filter.update(updated_position, measurement_noise)
@@ -65,7 +66,7 @@ class SensorFusion:
             # If only the camera value is valid, use it
             updated_position = camera_position[0]
             self.x_filter.update(updated_position, measurement_noise)
-        elif self.is_valid(encoder_position[0], min_val=0):
+        elif self.is_valid(encoder_position[0]):
             # If only the encoder value is valid, use it
             updated_position = encoder_position[0]
             self.x_filter.update(updated_position, measurement_noise)
