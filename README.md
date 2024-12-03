@@ -99,9 +99,16 @@ make your code robust and failproof to connection problem to the robot. (expect 
 (ask chatGPT to generate a main and a thread and call the update function from the thread at 100 Hz/ every 10ms), make sure your mutex work when you update the waypoints/position
 
 # Work package 2) -> Felipe
-the goal if to use openCV to find the position and orientation of the objects on the map.
-The camera will be look at the floor and can see the whole map.
-This module will return the position and orientation of the robot + a NxM matrix with the space occupancy of the map (used for path planning) + the position and orientation of the crash.
+
+This class sets up a computer vision system using OpenCV, with the main goal of generating an occupancy grid. This grid represents the environment as occupied and free areas, based on images captured from a camera or loaded from a file. The grid will then be used by other modules in the project for tasks like navigation.
+
+The VisionSystem class offers a flexible way to capture images, allowing the use of either a real-time camera or static image files, which is especially useful for testing. It uses ArUco markers to detect two key elements: the robot and the goal. Using these markers, the class can locate these objects in the environment, calculating their positions in millimeters and their orientations.
+
+Camera calibration is included to improve the accuracy of measurements. It uses a checkerboard pattern to adjust the camera parameters and calculate the size of a pixel in millimeters. This ensures that image coordinates can be converted into real-world distances.
+
+Finally, the main method, which generates the occupancy grid, processes the image to identify fixed obstacles in the environment. It converts the image to grayscale, applies a filter to reduce noise, and binarizes the image to create a clear map of occupied and free areas. The resulting grid will then be used by other project modules.
+
+In summary, this class provides an occupancy grid (NxM matrix) and return the position and orientation of the robot used for path planning.
 
 ```
 class VisionSystem:
