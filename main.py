@@ -67,7 +67,8 @@ def main():
         goalPosFromCamera = vision.get_goal_position()
         robotPosFromEncoder = robot.get_position()
         robotSpeedFromEncoder = robot.get_speed()
-        robotPosFromFusion = sensorfusion.get_estimated_position(robotPosFromEncoder, robotSpeedFromEncoder, robotPosFromCamera)
+        elapsed_time = time.perf_counter() - start_time
+        robotPosFromFusion = sensorfusion.get_estimated_position(robotPosFromEncoder, robotSpeedFromEncoder, robotPosFromCamera, delta_t=elapsed_time)
         #robot.set_position(robotPosFromFusion)
 
         # Update plot dynamically
@@ -75,7 +76,7 @@ def main():
         #visualizer.update_background(fameA, fameB)
         
         # Calculate the elapsed time and sleep for the remainder of the interval
-        elapsed_time = time.perf_counter() - start_time
+
         sleep_time = max(0, interval - elapsed_time)  # Ensure non-negative sleep time
         if (sleep_time == 0):
             print("slow loop cant keep up. please lower frequency or optimize better")

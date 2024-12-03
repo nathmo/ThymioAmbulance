@@ -39,7 +39,7 @@ class ParticleFilter:
 
 
 class SensorFusion:
-    def __init__(self, num_particles=10000, x_range=(0, 1000), y_range=(0, 1000), theta_range=(-np.pi, np.pi)):
+    def __init__(self, num_particles=10000, x_range=(0, 10000), y_range=(0, 10000), theta_range=(-2*np.pi, 2*np.pi)):
         # Number of particles for each filter
         self.num_particles = num_particles
 
