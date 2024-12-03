@@ -5,10 +5,12 @@ from visionsystem import VisionSystem
 from sensorfusion import SensorFusion
 from pathplanner import PathPlanner
 import numpy as np
+from visualisation import Visualisation
+import os
 
 def update_loop(robot):
-    """Function to run robot.update() in a separate thread at ~100 Hz."""
-    interval = 0.01  # 10 ms interval (100 Hz)
+    """Function to run robot.update() in a separate thread at ~1 Hz."""
+    interval = 1  # 1000 ms interval (1 Hz)
 
     while True:
         start_time = time.perf_counter()  # Record the start time
@@ -25,16 +27,29 @@ def update_loop(robot):
 
 def main():
     #
-    robot = RobotMovement()
-    vision = VisionSystem(use_camera=True)
+    robot = RobotMovement(debug=False) # debug=True -> dont need robot for simulation
+    robot.connect()
+    vision = VisionSystem(use_camera=True, cameraID=1, image_path=os.path.join("testData", "test.jpg"))
     sensorfusion = SensorFusion()
     pathplanner = PathPlanner(pixel_size_mm=vision.get_pixel_side_mm())
     # Start a separate thread for the update loop
     update_thread = threading.Thread(target=update_loop, args=(robot,))
     update_thread.daemon = True  # Daemonize thread to exit when main program exits
     update_thread.start()
+    visualizer = Visualisation(vision.get_pixel_side_mm())
+    fameA = vision.generate_occupancy_grid()
+    fameB = vision.get_frame()
+    #visualizer.update_background(fameA, fameB)
+    interval = 5  # 5000 ms interval (0.2 Hz)
 
-    interval = 1  # 1000 ms interval (1 Hz)
+    robotPosFromCamera = vision.get_robot_position()
+    goalPosFromCamera = vision.get_goal_position()
+    occupancyGrid = vision.generate_occupancy_grid()
+    waypoints = pathplanner.get_waypoints(occupancyGrid, robotPosFromCamera, goalPosFromCamera)
+    robot.set_waypoints(waypoints)
+    robot.set_position(robotPosFromCamera)
+
+    # compute only once the waypoints.
     while True:
         start_time = time.perf_counter()  # Record the start time
         '''
@@ -50,23 +65,15 @@ def main():
         # add a line to set pixel scale to the path finder
         robotPosFromCamera = vision.get_robot_position()
         goalPosFromCamera = vision.get_goal_position()
-        occupancyGrid = vision.generate_occupancy_grid()
         robotPosFromEncoder = robot.get_position()
         robotSpeedFromEncoder = robot.get_speed()
         robotPosFromFusion = sensorfusion.get_estimated_position(robotPosFromEncoder, robotSpeedFromEncoder, robotPosFromCamera)
-        waypoints = pathplanner.get_waypoints(occupancyGrid, robotPosFromFusion, goalPosFromCamera)
-        robot.set_position(robotPosFromFusion)
-        robot.set_waypoints(waypoints)
-        print("Main ran and have the following intermediate value : ")
-        print("waypoints : " + str(waypoints))
-        print("number of waypoints : " + str(len(waypoints)))
-        print("robotPosFromCamera : "+str(robotPosFromCamera))
-        print(" + robotPosFromEncoder : " + str(robotPosFromEncoder))
-        print(" = robotPosFromFusion : " + str(robotPosFromFusion))
-        print("robotSpeedFromEncoder : " + str(robotSpeedFromEncoder))
-        print("goalPosFromCamera : " + str(goalPosFromCamera))
-        print("---------------------------------------------------------")
+        #robot.set_position(robotPosFromFusion)
 
+        # Update plot dynamically
+        visualizer.update_plot(fameA, fameB, robotPosFromEncoder, robotPosFromCamera, robotPosFromFusion, goalPosFromCamera, waypoints)
+        #visualizer.update_background(fameA, fameB)
+        
         # Calculate the elapsed time and sleep for the remainder of the interval
         elapsed_time = time.perf_counter() - start_time
         sleep_time = max(0, interval - elapsed_time)  # Ensure non-negative sleep time

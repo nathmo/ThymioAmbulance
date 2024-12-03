@@ -1,8 +1,9 @@
-#opencv-python-headless #add here the library you need, one per line
+#add here the library you need, one per line
 opencv-contrib-python-headless
-#opencv-python
-#opencv-contrib-python
 numpy
-PIL
 matplotlib
 filterpy
+scikit-image
+shapely
+PyQt6
+tdmclient # also require to install ThymioSuite https://www.thymio.org/download-thymio-suite-redirect/

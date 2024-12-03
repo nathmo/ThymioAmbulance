@@ -3,8 +3,9 @@ import random
 import heapq
 import os
 import time
-import matplotlib.pyplot as plt
-from helper import *
+from visualisation import Visualisation
+from visionsystem import VisionSystem
+
 
 class PathPlanner:
     def __init__(self, pixel_size_mm=4):
@@ -22,12 +23,12 @@ class PathPlanner:
         self.rng_ratio = 0.01
         self.nb_max_point = 1000
         self.pixcel_iteration = 5
-        self.points_distance =int(80/self.pixel_size_mm)
-        self.pointRadius = int(80/self.pixel_size_mm)  # minimum distance from other points and obstacles(~80mm)
-        self.wall_Radius =int(80/self.pixel_size_mm)
-        self.lineRadius = int(55/self.pixel_size_mm)  # minimum distance from other points and obstacles(~55mm)
+        self.points_distance = int(80 / self.pixel_size_mm)
+        self.pointRadius = int(80 / self.pixel_size_mm)  # minimum distance from other points and obstacles(~80mm)
+        self.wall_Radius = int(80 / self.pixel_size_mm)
+        self.lineRadius = int(55 / self.pixel_size_mm)  # minimum distance from other points and obstacles(~55mm)
         self.init_enhanced_grid = True
-        self.enhanced_grid= []
+        self.enhanced_grid = []
 
     def is_valid_point(self, point, placed_points):
         """
@@ -68,42 +69,62 @@ class PathPlanner:
         dy = y2 - y1
         slope = dy
         if dx != 0:
-            slope = slope / dx # Calculate the slope of the line
+            slope = slope / dx  # Calculate the slope of the line
 
-        if(abs(slope)<=1): #Iter x if small slope
-            if(x1 > x2): # Ensure that x1, y1 is the left-most point
+        if (abs(slope) <= 1):  # Iter x if small slope
+            if (x1 > x2):  # Ensure that x1, y1 is the left-most point
                 x1, x2 = x2, x1
                 y1, y2 = y2, y1
-            for x in range(int(x1), int(x2) + 1, self.pixcel_iteration): # Loop over the x range, calculate y for each x
+            for x in range(int(x1), int(x2) + 1,
+                           self.pixcel_iteration):  # Loop over the x range, calculate y for each x
                 y = y1 + slope * (x - x1)
                 y_int = int(round(y))
-                if(self.enhanced_grid[y_int,x]):
+                if (self.enhanced_grid[y_int, x]):
+                    #print("A y: " + str(y_int)+" x "+str(x))
                     return True
 
-        if(abs(slope)>1): #Iter y if slope too stiff
-            if(y1 > y2): # Ensure that x1, y1 is the left-most point
+        if (abs(slope) > 1):  # Iter y if slope too stiff
+            if (y1 > y2):  # Ensure that x1, y1 is the left-most point
                 x1, x2 = x2, x1
                 y1, y2 = y2, y1
-            for y in range(int(y1), int(y2) + 1, self.pixcel_iteration): # Loop over the y range, calculate x for each y
-                x = ((y-y1)/slope) + x1
+            for y in range(int(y1), int(y2) + 1,
+                           self.pixcel_iteration):  # Loop over the y range, calculate x for each y
+                x = ((y - y1) / slope) + x1
                 x_int = int(round(x))
-                if(self.enhanced_grid[y,x_int]):
+                if (self.enhanced_grid[y, x_int]):
+                    #print("B y: " + str(y)+" x_int "+str(x_int))
                     return True
 
         # Handle edge cases for vertical or horizontal lines
         if dx == 0:  # Vertical line
             for y in range(int(min(y1, y2)), int(max(y1, y2)) + 1, self.pixcel_iteration):
-                if(self.enhanced_grid[y,x1]):
+                if (self.enhanced_grid[y, x1]):
+                    #print("C y: " + str(y)+" x "+str(x1))
                     return True
             return False
 
         if dy == 0:  # Horizontal line
             for x in range(int(min(x1, x2)), int(max(x1, x2)) + 1, self.pixcel_iteration):
-                if(self.enhanced_grid[y1,x]):
+                if (self.enhanced_grid[y1, x]):
+                    #print("D y: " + str(y1)+" x "+str(x))
                     return True
             return False
 
         return False
+
+    def scale_and_flip_waypoints(self, waypoints, pixel_height, pixel_width):
+        """
+        flip vertically the coordinate and scale back to the correct size in mm
+        (actually dont flip, just scale)
+        :param waypoints: List of numpy arrays where each array is of the form [x, y].
+        :return: List of updated waypoints.
+        """
+        updated_waypoints = []
+
+        for i in range(len(waypoints)):
+            updated_waypoints.append(np.array([waypoints[i][0]*self.pixel_size_mm, (pixel_height-waypoints[i][1])*self.pixel_size_mm]))
+
+        return updated_waypoints
 
     def compute_angles_for_waypoints(self, waypoints):
         """
@@ -113,33 +134,34 @@ class PathPlanner:
         :param waypoints: List of numpy arrays where each array is of the form [x, y, theta].
         :return: List of updated waypoints with computed theta values.
         """
-        updated_waypoints = []
+        if len(waypoints)>1:
+            updated_waypoints = []
 
-        for i in range(len(waypoints) - 1):
-            # Current and next waypoints
-            current = waypoints[i]
-            next_wp = waypoints[i + 1]
+            for i in range(len(waypoints)-1):
+                # Current and next waypoints
+                current = waypoints[i]
+                next_wp = waypoints[i + 1]
 
-            # Compute the delta x and delta y
-            delta_x = next_wp[0] - current[0]
-            delta_y = next_wp[1] - current[1]
+                # Compute the delta x and delta y
+                delta_x = next_wp[0] - current[0]
+                delta_y = next_wp[1] - current[1]
 
-            # Compute the angle (theta) using arctan2, adjusting to clockwise from x-axis
-            theta = np.arctan2(-delta_y, delta_x)
+                # Compute the angle (theta) using arctan2, adjusting to clockwise from x-axis
+                theta = np.arctan2(-delta_y, delta_x)
 
-            # Update the current waypoint with the computed angle
-            updated_waypoints.append(np.array([current[0], current[1], theta]))
+                # Update the current waypoint with the computed angle
+                updated_waypoints.append(np.array([current[0], current[1], theta]))
 
-        # Append the last waypoint with the same theta as the second-to-last one
-        last_theta = updated_waypoints[-1][2] if updated_waypoints else 0
-        updated_waypoints.append(np.array([waypoints[-1][0], waypoints[-1][1], last_theta]))
-
+            # Append the last waypoint with the same theta as the second-to-last one
+            last_theta = updated_waypoints[-1][2] if updated_waypoints else 0
+            updated_waypoints.append(np.array([waypoints[-1][0], waypoints[-1][1], last_theta]))
+        else:
+            updated_waypoints=[np.array([0.0, 0.0, 0.0])]
         return updated_waypoints
-    
 
     def compute_enhance_grid(self, occupancy_grid):
         """
-        Enhances the occupancy grid by marking a disc-shaped neighborhood of True 
+        Enhances the occupancy grid by marking a disc-shaped neighborhood of True
         values around each True cell in the original grid.
 
         Args:
@@ -148,19 +170,19 @@ class PathPlanner:
         Returns:
             np.ndarray: A 2D binary array with the enhanced grid.
         """
-        #start_time_grid= time.time()
+        # start_time_grid= time.time()
         # Create the enhanced grid initialized to False
         enhancing_grid = np.zeros_like(occupancy_grid, dtype=bool)
-        
+
         # Get the shape of the grid
         rows, cols = occupancy_grid.shape
 
         # Precompute a mask for a disc of radius `lineRadius`
         radius = self.wall_Radius
         diameter = 2 * radius + 1
-        y, x = np.ogrid[-radius:radius+1, -radius:radius+1]
-        disc_mask = (x**2 + y**2 <= radius**2)
-        
+        y, x = np.ogrid[-radius:radius + 1, -radius:radius + 1]
+        disc_mask = (x ** 2 + y ** 2 <= radius ** 2)
+
         # Loop over the grid and expand the True values using the disc mask
         for r in range(rows):
             for c in range(cols):
@@ -170,19 +192,18 @@ class PathPlanner:
                     row_max = min(rows, r + radius + 1)
                     col_min = max(0, c - radius)
                     col_max = min(cols, c + radius + 1)
-                    
+
                     # Get the part of the disc mask that fits within the grid boundaries
                     disc_row_start = max(0, radius - r)
                     disc_row_end = diameter - max(0, r + radius + 1 - rows)
                     disc_col_start = max(0, radius - c)
                     disc_col_end = diameter - max(0, c + radius + 1 - cols)
-                    
+
                     # Apply the mask to the enhancing grid
                     enhancing_grid[row_min:row_max, col_min:col_max] |= \
                         disc_mask[disc_row_start:disc_row_end, disc_col_start:disc_col_end]
-    
-        return enhancing_grid
 
+        return enhancing_grid
 
     def get_waypoints(self, occupancy_grid, start, target):
         """
@@ -193,7 +214,7 @@ class PathPlanner:
         :param target: Target position (x, y, orientation).
         :return: List of waypoints.
         """
-        if(self.init_enhanced_grid):
+        if (self.init_enhanced_grid):
             self.enhanced_grid = self.compute_enhance_grid(occupancy_grid)
             self.init_enhanced_grid = False
 
@@ -202,33 +223,37 @@ class PathPlanner:
         num_free_pixels = len(free_space)
 
         # Calculate the target number of points to place (5% of free space but cap to 1000)
-        points_to_place = min(int(self.rng_ratio * num_free_pixels),self.nb_max_point)
+        points_to_place = min(int(self.rng_ratio * num_free_pixels), self.nb_max_point)
 
         placed_points = []
         # Start and target positions (manually added)
-        placed_points.append(tuple(start[:2]))
-        placed_points.append(tuple(target[:2]))
+        scaled_start = tuple(start[:2]/self.pixel_size_mm)
+        scaled_target = tuple(target[:2]/self.pixel_size_mm)
+        print("scaled_start" +str(scaled_start))
+        print("scaled_target" +str(scaled_target))
+        placed_points.append(scaled_start)
+        placed_points.append(scaled_target)
 
         # Place random points
         timeout = 0
         while len(placed_points) < points_to_place + 2:  # Include start and target
             # Randomly pick a point from free space
             timeout = timeout + 1
-            if(timeout>points_to_place*2):
-                break # in case its not possible to place all the point dont block the system
-            y, x = random.choice(free_space) # value are unpacked in the wrong order for some reason
+            if (timeout > points_to_place * 2):
+                break  # in case its not possible to place all the point dont block the system
+            y, x = random.choice(free_space)  # value are unpacked in the wrong order for some reason
             if self.is_valid_point((x, y), placed_points):
-                placed_points.append((x, y)) # if a point taken at random is in a valid place
+                placed_points.append((x, y))  # if a point taken at random is in a valid place
                 # not too close to an obstacle nor another point.
-    
+
         # Run A* to find the path from start to target through the placed points
-        waypoints = self.a_star(start, target, placed_points)
+        waypoints = self.a_star(scaled_start, scaled_target, placed_points)
         #retour = []  # to see the point placed at random on the map instead of the waypoints :
         #for p in placed_points:
-        #    retour.append((p[0], p[1], 0))
+        #   retour.append((p[0]*self.pixel_size_mm, p[1]*self.pixel_size_mm, 0))
         #return retour
-        plot_robot_grid(self.enhanced_grid, 1, robot, robot, robot, goal, waypoints) #to see the enhanced grid
-        return  self.compute_angles_for_waypoints(waypoints) # the angle are a bonus and simplify teh robot control.
+        waypoints = self.scale_and_flip_waypoints(waypoints, width, height)
+        return self.compute_angles_for_waypoints(waypoints)  # the angle are a bonus and simplify teh robot control.
 
     def a_star(self, startpoint, goalpoint, available_nodes):
         """
@@ -248,7 +273,7 @@ class PathPlanner:
 
         # Initialize the start node
         g_start = 0  # The cost from the start node to itself is 0
-        h_start = np.linalg.norm(np.array(start) - np.array(goal)) # Heuristic from the start to goal
+        h_start = np.linalg.norm(np.array(start) - np.array(goal))  # Heuristic from the start to goal
         f_start = g_start + h_start
 
         # Push start node to open list
@@ -263,7 +288,7 @@ class PathPlanner:
             if current == goal:
                 path = []
                 while current in came_from:
-                    path.append(np.array([current[0],current[1], 0]))
+                    path.append(np.array([current[0], current[1], 0]))
                     current = came_from[current]
                 path.append(startpoint)
                 return path[::-1]  # Return the reversed path (start to goal)
@@ -280,6 +305,7 @@ class PathPlanner:
 
                 # Check if the line between current and neighbor collides with an obstacle
                 if self.is_line_colliding(current, neighbor):
+                    #print("skipped : "+str(current)+" trying to reach"+str(neighbor))
                     continue  # Skip this neighbor if collision detected
 
                 # Calculate the g score for the neighbor
@@ -291,13 +317,12 @@ class PathPlanner:
                     g_costs[neighbor] = tentative_g
                     h = np.linalg.norm(np.array(neighbor) - np.array(goal))
                     f = tentative_g + h
-                    
+
                     heapq.heappush(open_list, (f, neighbor))  # Add neighbor to open list
 
                     came_from[neighbor] = current  # Record the parent node to reconstruct the path
-        
+        print("No Path Found")
         return []  # Return an empty list if no path found
-
 
 
 if __name__ == "__main__":
@@ -305,10 +330,13 @@ if __name__ == "__main__":
     path = os.path.join("testData", "mapWithBlackObstacle1.txt") #mapOneIsland2
     matrix = np.loadtxt(path, dtype=int)
     occupancyGrid = matrix.astype(bool)
-
+    vision = VisionSystem(use_camera=False, image_path=os.path.join("testData", "test.jpg"))
+    occupancyGrid = vision.generate_occupancy_grid()
     # Define the goal and robot states
-    goal = np.array([36, 294, np.pi / 6])  # slightly different than the default camera one
-    robot = np.array([463,382, np.pi / 6])  # slightly different than the default camera one
+    #goal = np.array([36, 294, np.pi / 6])  # slightly different than the default camera one
+    #robot = np.array([463,382, np.pi / 6])  # slightly different than the default camera one
+    goal = vision.get_goal_position()
+    robot = vision.get_robot_position()
     print("Robot:", robot)
     print("Goal:", goal)
 
@@ -316,15 +344,16 @@ if __name__ == "__main__":
     robotSpeedFromEncoder = np.array([0, 0, 0])  # no speed
 
     # Initialize the planner
-    planner = PathPlanner()
+    planner = PathPlanner(pixel_size_mm=vision.get_pixel_side_mm())
 
     # Time the waypoint calculation
     start_time = time.time()
     waypoints = planner.get_waypoints(occupancyGrid, robot, goal)
+    print("number of waypoints "+str(len(waypoints)))
     print("waypoints "+str(waypoints))
     end_time = time.time()
-
+    #occupancyGrid = planner.enhanced_grid
     # Plot and finalize
-    plot_robot_grid(occupancyGrid, 1, robot, robot, robot, goal, waypoints)
+    Visualisation.plot_robot_grid(occupancyGrid, vision.get_pixel_side_mm(), robot, robot, robot, goal, waypoints)
     print("Waypoint calculation complete.")
     print(f"Elapsed time: {end_time - start_time:.4f} seconds")
