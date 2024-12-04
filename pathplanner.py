@@ -122,7 +122,7 @@ class PathPlanner:
         updated_waypoints = []
 
         for i in range(len(waypoints)):
-            updated_waypoints.append(np.array([waypoints[i][0]*self.pixel_size_mm, (pixel_height-waypoints[i][1])*self.pixel_size_mm]))
+            updated_waypoints.append(np.array([waypoints[i][0]*self.pixel_size_mm, (waypoints[i][1])*self.pixel_size_mm]))
 
         return updated_waypoints
 

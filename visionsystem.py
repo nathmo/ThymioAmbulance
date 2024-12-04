@@ -222,7 +222,7 @@ class VisionSystem:
         else:
             print("No ArUco markers detected. return 0,0,0")
         # Returning an example value as placeholder
-        return np.array([0, 0, 0])
+        return np.array([0.0, 0.0, 0.0])
 
 
     def get_goal_position(self):
@@ -275,7 +275,7 @@ class VisionSystem:
         else:
             print("No ArUco markers detected. return 0,0,0")
         # Returning an example value as placeholder
-        return np.array([0, 0, 0])
+        return np.array([0.0, 0.0, 0.0])
 
     def generate_occupancy_grid(self):
         # Create and return an NxM occupancy grid based on the map layout

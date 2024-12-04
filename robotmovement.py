@@ -135,7 +135,7 @@ list of robot variable :
 
 robot_variables = list(aw(self.node.var_description()))
 print(robot_variables)
-            
+
 ['_id', 
 'event.source', 
 'event.args', 
@@ -183,7 +183,7 @@ print(robot_variables)
 
 theses value can be modified using :
 
-BEWARE : IT IS NOT RESPONSIVE. EXPECTE 1 sec to apply the command.
+BEWARE : IT IS NOT RESPONSIVE. EXPECTE up to 1 sec to apply the command.
 
 aw(self.node.lock())  # Acquire lock explicitly
 aw(self.client.wait_for_status(self.client.NODE_STATUS_READY))
@@ -193,7 +193,7 @@ v = {
 }
 aw(self.node.set_variables(v))
 aw(self.node.unlock())  # Release lock
-                       
+
 To read the value : 
 
 self.node.lock()
@@ -203,34 +203,33 @@ self.node.unlock()
 
 '''
 
-priority_1 = 1000
-priority_2 = 2000
-priority_3 = 3000
-Kp = 0.15
-Kd = 0.05
-Ki = 0.05
-# angular_speed_min = 0.5
-# angular_speed_max = 4.5
-forward_speed_max = 150
-forward_speed_min = 10
-I_distance = 0
-# I_angle = 0
-
 
 class RobotMovement:
-    def __init__(self):
+    def __init__(self, debug=False):
         # Connect to the robot using tdmclient
-        self.client = ClientAsync()
+        if not debug:
+            self.client = ClientAsync()  # tdm_addr = "172.18.128.1"
+            # self.client.tdm_port =
+        else:
+            self.client = None
         self.node = None
-        self.waypoints = [np.array([0.0, 0.0, 0.0])]  # List of np.array for waypoints , (a list of numpy array coded like position)
-        self.position = np.array([0.0, 0.0, 0.0])  # Current position of the robot (x [mm], y[mm], angle with the x/horizontal axis in radian (clockwise rotation is positive))
+        self.debug = debug
+        self.waypoints = [
+            np.array([0.0, 0.0, 0.0])]  # List of np.array for waypoints , (a list of numpy array coded like position)
+        self.position = np.array([0.0, 0.0,
+                                  0.0])  # Current position of the robot (x [mm], y[mm], angle with the x/horizontal axis in radian (clockwise rotation is positive))
         self.speed = np.array([0.0, 0.0, 0.0])  # Current speed of the robot (same format as position but per second)
         self._lock = Lock()  # Mutex lock for thread safety
         self.last_update_time = time.time()
         self.total_elapsed_time = 0
         self.update_count = 0
-        self.distance = 0
-        self.prev_distance = 0
+        self.tolerance_radian = 0.6
+        self.tolerance_mm = 50
+        self.min_agular_speed = 0.5
+        self.max_agular_speed = 4.5
+        self.min_linear_speed = 10
+        self.max_linear_speed = 100
+        self.proximity_threshold = 1000
 
     def __del__(self):
         # Ensure the node is unlocked before the instance is destroyed
@@ -243,11 +242,12 @@ class RobotMovement:
                 print(f"Error unlocking the robot: {e}")
 
     def connect(self):
-        print("IP address "+str(self.client.tdm_addr))
-        print("Port "+str(self.client.tdm_port))
-        self.node = aw(self.client.wait_for_node())
-        aw(self.node.lock())
-        aw(self.client.wait_for_status(self.client.NODE_STATUS_READY))
+        if not self.debug:
+            print("IP address " + str(self.client.tdm_addr))
+            print("Port " + str(self.client.tdm_port))
+            self.node = aw(self.client.wait_for_node())
+            aw(self.node.lock())
+            aw(self.client.wait_for_status(self.client.NODE_STATUS_READY))
 
     def set_waypoints(self, waypoints):
         with self._lock:
@@ -273,89 +273,7 @@ class RobotMovement:
         with self._lock:
             self.speed = speed
 
-
-    # def PID(self, time_period):
-    #     ir_sensors = self.get_proximity_ir_sensor()
-    #     turning_angle = 0
-    #     obstacle_detec = False
-    #     global I_distance 
-    #         # Adjust speeds based on differences
-    #     if (ir_sensors["front_left"]>priority_3):
-    #         obstacle_detec = True
-    #         turning_angle = 1
-    #         self.set_angular_speed(1)   #turn left with a speed of one radian per second ~= 57 degrees per second
-    #         self.set_speed(np.array([0.0, 0.0, 1.0]))
-    #         self.set_straight_speed(20)
-    #         self.set_speed(np.array([20.0*np.cos(1), 20.0*np.sin(1), 0.0]))
-    #     elif (ir_sensors["front_center_left"]>priority_1):
-    #         obstacle_detec = True
-    #         turning_angle = 1
-    #         self.set_angular_speed(1)
-    #         self.set_speed(np.array([0.0, 0.0, 1.0]))
-    #         self.set_straight_speed(20)
-    #         self.set_speed(np.array([20.0*np.cos(1), 20.0*np.sin(1), 0.0]))                
-    #     elif (ir_sensors["front_center"]>priority_2):     #if the front center sensor detect an obstacle, turn left, 
-    #         obstacle_detec = True                   # chosen randomly, can be changed, less priority than the front left and right sensors
-    #         turning_angle = -1                      # because the case where the robot is facing a "thin" obstacle is extreme and less likely
-    #         self.set_angular_speed(-1)              # to happen, and this case is already handled by the front left and right sensors, as the
-    #         self.set_speed(np.array([0.0, 0.0, -1.0])) # the center sensor doesnt give more info than this, so this case is not really useful ==> can be removed
-    #         self.set_straight_speed(20)
-    #         self.set_speed(np.array([20.0*np.cos(-1), 20.0*np.sin(-1), 0.0]))                
-    #     elif (ir_sensors["front_center_right"]>priority_1):
-    #         obstacle_detec = True                
-    #         turning_angle = -1
-    #         self.set_angular_speed(-1)
-    #         self.set_speed(np.array([0.0, 0.0, -1.0]))
-    #         self.set_straight_speed(20)
-    #         self.set_speed(np.array([20.0*np.cos(-1), 20.0*np.sin(-1), 0.0]))                
-    #     elif (ir_sensors["front_right"]>priority_3):
-    #         obstacle_detec = True
-    #         turning_angle = -1
-    #         self.set_angular_speed(-1)
-    #         self.set_speed(np.array([0.0, 0.0, -1.0])) 
-    #         self.set_straight_speed(20)
-    #         self.set_speed(np.array([20.0*np.cos(-1), 20.0*np.sin(-1), 0.0]))  
-
-    #     if (not obstacle_detec and abs(self.angle_diff) > 0.2):
-    #         P = self.angle_diff / time_period
-    #         # D = Kd * (self.angle_diff - self.prev_angle_diff) / time_period
-    #         # I_angle += Ki * (self.prev_angle_diff + self.angle_diff) * time_period
-    #         # if abs(I_angle) > 0.5:
-    #             # I_angle = 0.5 * np.sign(I_angle)
-    #         angular_speed = P
-    #         if abs(angular_speed) < angular_speed_min:
-    #             angular_speed = angular_speed_min * np.sign(angular_speed)
-    #         if abs(angular_speed) > angular_speed_max:
-    #             angular_speed = angular_speed_max * np.sign(angular_speed)
-    #         angular_speed = round(angular_speed, 1)
-    #         self.set_speed(np.array([0.0, 0.0, angular_speed]))
-    #         self.set_angular_speed(angular_speed)    
-
-    #     if (abs(self.distance) > 1.0):
-    #         P = Kp * self.distance
-    #         D = Kd * (self.distance - self.prev_distance) / time_period
-    #         I_distance += Ki * (self.prev_distance + self.distance) * time_period
-    #         if abs(I_distance) > 0.5:
-    #             I_distance = 0.5 * np.sign(I_distance)
-    #         forward_speed = P + D + I_distance
-    #         if abs(forward_speed) > forward_speed_max:
-    #             forward_speed = forward_speed_max * np.sign(forward_speed)
-    #         forward_speed = round(forward_speed, 0)
-    #         theta = self.get_position()[2]
-    #         vx = forward_speed * np.cos(theta)
-    #         vy = forward_speed * np.sin(theta)
-    #         self.set_speed(np.array([vx, vy, 0.0]))
-    #         self.set_straight_speed(forward_speed)
-
-    #     if abs(self.distance) < 1.0 and abs(self.angle_diff) < 0.2:
-    #         self.set_waypoints(self.get_waypoints()[1:])
-    #         self.set_speed(np.array([0.0, 0.0, 0.0]))
-    #         self.set_straight_speed(0.0)
-    #         print("Waypoint reached")            
- 
-
     def update(self):
-        global I_distance
         current_time = time.time()
 
         elapsed_time = current_time - self.last_update_time
@@ -367,122 +285,94 @@ class RobotMovement:
         average_elapsed_time = self.total_elapsed_time / self.update_count
 
         # Increment position by speed * elapsed_time
+        speed = self.get_speed()
         position = self.get_position()
-        position += self.get_speed() * elapsed_time
+        position += speed * elapsed_time  # integrate position from speed over time
         self.set_position(position)
         waypoints = self.get_waypoints()
+
+        ir_sensors = self.get_proximity_ir_sensor()
+        if ir_sensors["front_center"] > self.proximity_threshold:
+            unit_normal = np.array([np.sin(-position[2]), np.cos(-position[2]), 0])
+            waypoints.insert(0, position + unit_normal * 100)
+            self.set_waypoints(waypoints)  # add a new waypoint away from obstacle
+        elif ir_sensors["front_left"] > self.proximity_threshold:
+            unit_normal = np.array([np.sin(-position[2]), np.cos(-position[2]), 0])
+            waypoints.insert(0, position - unit_normal * 100)  # BEWARE, sign reversed
+            self.set_waypoints(waypoints)  # add a new waypoint away from obstacle
+        elif ir_sensors["front_center_left"] > self.proximity_threshold:
+            unit_normal = np.array([np.sin(-position[2]), np.cos(-position[2]), 0])
+            waypoints.insert(0, position - unit_normal * 100)  # BEWARE, sign reversed
+            self.set_waypoints(waypoints)  # add a new waypoint away from obstacle
+        elif ir_sensors["front_right"] > self.proximity_threshold:
+            unit_normal = np.array([np.sin(-position[2]), np.cos(-position[2]), 0])
+            waypoints.insert(0, position + unit_normal * 100)
+            self.set_waypoints(waypoints)  # add a new waypoint away from obstacle
+        elif ir_sensors["front_center_right"] > self.proximity_threshold:
+            unit_normal = np.array([np.sin(-position[2]), np.cos(-position[2]), 0])
+            waypoints.insert(0, position + unit_normal * 100)
+            self.set_waypoints(waypoints)  # add a new waypoint away from obstacle
+
         if waypoints:
             next_waypoint = waypoints[0]
             delta = next_waypoint - self.position
-            self.prev_distance = self.distance
-            self.distance = np.linalg.norm(delta[:2])
+
             # Compute signed distance and angular difference
-            angle_to_target = np.arctan2(delta[1], delta[0])
-            # self.prev_angle_diff = angle_diff
+            angle_to_target = -np.arctan2(delta[1], delta[0])
             angle_diff = angle_to_target - self.position[2]
             distance_vector = delta[:2]
-            if(abs(angle_diff)<np.pi):
-                self.distance = np.linalg.norm(distance_vector)
-            else:
-                self.distance = -np.linalg.norm(distance_vector)
 
-            if not (int(self.update_count) % max(10, int(1/(min(1, average_elapsed_time))))) :
-                print("-------------------------------------------")
-                print("speed "+str(self.get_speed()))
-                print("position "+str(position))
-                print("target " + str(next_waypoint))
-                print("Distance to target : "+str(self.distance))
-                print("angle to target : " + str(angle_diff))
-                print("average elapsed time "+str(average_elapsed_time))
-                print("time since last print "+str(average_elapsed_time*self.update_count))
+            distance = np.linalg.norm(distance_vector)
+
             # Normalize angle_diff to [-pi, pi]
-            # angle_diff = (angle_diff + np.pi) % (2 * np.pi) - np.pi
-            
-            # Check for overshooting: angle difference around ±180° indicates overshoot
-            # if abs(angle_diff) > np.pi / 2:
-            #     self.distance = -self.distance  # Negative distance if overshot
+            angle_diff = (angle_diff + np.pi) % (2 * np.pi) - np.pi
 
-            # self.PID(average_elapsed_time)
+            # This work as a P controller by ajusting speed as a function of the distance/angle left to reach the waypoint
+            # speed (linear or angular are capped between two limit value)
+            if not (int(self.update_count) % max(2, int(1 / (min(1, average_elapsed_time))))):
+                print("-------------------------------------------")
+                print("speed " + str(self.get_speed()))
+                print("position " + str(position))
+                print("target " + str(next_waypoint))
+                print("Distance to target : " + str(distance))
+                print("angle to target : " + str(angle_diff))
+                print("average elapsed time per robot update cycle " + str(average_elapsed_time))
+                print("time elapsed since last print " + str(10 * average_elapsed_time))
+                print("total run time " + str(self.update_count * average_elapsed_time))
+                print("waypoints left to reach : " + str(len(self.get_waypoints())))
 
-            ir_sensors = self.get_proximity_ir_sensor()
-            turning_angle = 0
-            obstacle_detec = False
-            # Adjust speeds based on differences
-            if (ir_sensors["front_left"]>3000):
-                obstacle_detec = True
-                turning_angle = 1
-                self.set_angular_speed(1)   #turn left with a speed of one radian per second ~= 57 degrees per second
-                self.set_speed(np.array([0.0, 0.0, 1.0]))
-                self.set_straight_speed(20)
-                self.set_speed(np.array([20.0*np.cos(1), 20.0*np.sin(1), 0.0]))
-            elif (ir_sensors["front_center_left"]>1000):
-                obstacle_detec = True
-                turning_angle = 1
-                self.set_angular_speed(1)
-                self.set_speed(np.array([0.0, 0.0, 1.0]))
-                self.set_straight_speed(20)
-                self.set_speed(np.array([20.0*np.cos(1), 20.0*np.sin(1), 0.0]))                
-            elif (ir_sensors["front_center"]>2000):     #if the front center sensor detect an obstacle, turn left, 
-                obstacle_detec = True                   # chosen randomly, can be changed, less priority than the front left and right sensors
-                turning_angle = -1                      # because the case where the robot is facing a "thin" obstacle is extreme and less likely
-                self.set_angular_speed(-1)              # to happen, and this case is already handled by the front left and right sensors, as the
-                self.set_speed(np.array([0.0, 0.0, -1.0])) # the center sensor doesnt give more info than this, so this case is not really useful ==> can be removed
-                self.set_straight_speed(20)
-                self.set_speed(np.array([20.0*np.cos(-1), 20.0*np.sin(-1), 0.0]))                
-            elif (ir_sensors["front_center_right"]>1000):
-                obstacle_detec = True                
-                turning_angle = -1
-                self.set_angular_speed(-1)
-                self.set_speed(np.array([0.0, 0.0, -1.0]))
-                self.set_straight_speed(20)
-                self.set_speed(np.array([20.0*np.cos(-1), 20.0*np.sin(-1), 0.0]))                
-            elif (ir_sensors["front_right"]>3000):
-                obstacle_detec = True
-                turning_angle = -1
-                self.set_angular_speed(-1)
-                self.set_speed(np.array([0.0, 0.0, -1.0])) 
-                self.set_straight_speed(20)
-                self.set_speed(np.array([20.0*np.cos(-1), 20.0*np.sin(-1), 0.0]))                           
-
-                # good idea to add a condition down here for the angular adjustment, that if no obstacle is detected then do it?
-                # I think yes because I want to keep the robot moving forward without returning to the old angle if an obstacle is detected                                  
-        
-            elif ((abs(angle_diff) > 0.2) and not obstacle_detec):  # Angular adjustment
+            if abs(angle_diff) > self.tolerance_radian:  # Angular adjustment
                 min_time = max(3 * average_elapsed_time, 1.0)  # Ensure min_time is at least 1 second
                 angular_speed = angle_diff / min_time
                 signe = np.sign(angular_speed)
-                angular_speed = max(0.5, abs(angular_speed))  # Ensure minimum angular speed of +/-0.5 rad/s
-                angular_speed = min(4.5, abs(angular_speed))  # Ensure maximum angular speed of +/-4.5 rad/s
-                angular_speed = round(angular_speed, 1)*signe
-                self.set_speed(np.array([0.0, 0.0, angular_speed+turning_angle]))
-                self.set_angular_speed(angular_speed+turning_angle)  #turning angle is added to the angular speed to make the robot turn more when an obstacle is detected
-            elif abs(self.distance) > 5.0:  # Forward adjustment
-
-                P = Kp * self.distance
-                D = Kd * (self.distance - self.prev_distance) / elapsed_time
-                I_distance += Ki * (self.prev_distance + self.distance) * elapsed_time
-                if abs(I_distance) > 0.5:
-                    I_distance = 0.5 * np.sign(I_distance)
-                forward_speed = P + D + I_distance
-                if abs(forward_speed) > forward_speed_max:
-                    forward_speed = forward_speed_max * np.sign(forward_speed)                
-                # min_time = max(10 * average_elapsed_time, 1.0)  # Ensure min_time is at least 1 second
-                # forward_speed = Kp * self.distance
-                # forward_speed = max(30.0, abs(forward_speed))  # Ensure minimum forward speed of 10 mm/s
-                # forward_speed = min(200.0, abs(forward_speed))  # Ensure maximum forward speed of 100 mm/s
-                forward_speed = round(forward_speed, 0) # the motor speed use a int
-                # theta = position[2]  # Angle (in radians) from the x-axis
-                vx = forward_speed * np.cos(angle_to_target)  # Project forward speed onto the x-axis
-                vy = forward_speed * np.sin(angle_to_target)  # Project forward speed onto the y-axis
+                angular_speed = max(self.min_agular_speed,
+                                    abs(angular_speed))  # Ensure minimum angular speed of +/-0.5 rad/s
+                angular_speed = min(self.max_agular_speed,
+                                    abs(angular_speed))  # Ensure maximum angular speed of +/-4.5 rad/s
+                angular_speed = round(angular_speed, 1) * signe
+                self.set_speed(np.array([0.0, 0.0, angular_speed]))
+                self.set_angular_speed(angular_speed)
+            elif distance > self.tolerance_mm:  # Forward adjustment
+                min_time = max(10 * average_elapsed_time, 1.0)  # Ensure min_time is at least 1 second
+                forward_speed = distance / min_time
+                forward_speed = max(self.min_linear_speed,
+                                    abs(forward_speed))  # Ensure minimum forward speed of 10 mm/s
+                forward_speed = min(self.max_linear_speed,
+                                    abs(forward_speed))  # Ensure maximum forward speed of 100 mm/s
+                forward_speed = round(forward_speed, 0)  # the motor speed use a int
+                theta = position[2]  # Angle (in radians) from the x-axis
+                vx = forward_speed * np.cos(-theta)  # Project forward speed onto the x-axis
+                vy = forward_speed * np.sin(-theta)  # Project forward speed onto the y-axis
                 # Set the projected speed
                 self.set_speed(np.array([vx, vy, 0.0]))
                 self.set_straight_speed(forward_speed)
-            elif abs(self.distance) < 5.0 and abs(angle_diff) < 0.2:
+            else:
                 # Reached waypoint, update to the next
+                self.set_speed(np.array([0.0, 0.0, 0.0]))
+                self.set_straight_speed(0)
                 self.set_waypoints(waypoints[1:])
                 print("Waypoint reached")
 
-  
         else:
             self.set_speed(np.array([0.0, 0.0, 0.0]))
             self.set_straight_speed(0.0)
@@ -526,7 +416,7 @@ class RobotMovement:
             return 0
         # Perform the conversion
         S = (abs(v) - c) / k
-        return int(S*(1 if v >= 0 else -1))
+        return int(S * (1 if v >= 0 else -1))
 
     def set_motor_speed(self, speed_left, speed_right):
         """
@@ -543,7 +433,8 @@ class RobotMovement:
             }
             aw(self.node.set_variables(v))
         else:
-            print("robot not connected")
+            if not self.debug:
+                print("robot not connected")
 
     def set_straight_speed(self, speed):
         """
@@ -566,7 +457,7 @@ class RobotMovement:
 
         (was manually adapted to 43 mm since the 47.5mm radius was not producing accurate rotation)
         """
-        motor_speed = self.mm_per_second_to_arbitrary_unit(angular_speed*43/(2))
+        motor_speed = self.mm_per_second_to_arbitrary_unit(angular_speed * 43 / (2))
         self.set_motor_speed(motor_speed, -motor_speed)
 
     def get_temperature(self):
@@ -574,11 +465,11 @@ class RobotMovement:
         return the temperature in an arbitrary unit (or in kelvin and really off by 10-20 K)
         """
         if self.node is not None:
-            #aw(self.node.lock())
+            # aw(self.node.lock())
             aw(self.client.wait_for_status(self.client.NODE_STATUS_READY))
             self.client.aw(self.node.wait_for_variables())
             temperature = self.node.v.temperature
-            #aw(self.node.unlock())
+            # aw(self.node.unlock())
             return temperature
         else:
             print("robot not connected")
@@ -590,12 +481,11 @@ class RobotMovement:
         """
 
         if self.node is not None:
-            #aw(self.node.lock())
             aw(self.client.wait_for_status(self.client.NODE_STATUS_READY))
             self.client.aw(self.node.wait_for_variables({"prox.horizontal"}))
             sensor = self.node.v.prox.horizontal
             sensorDict = {
-                "rear_right":sensor[6],
+                "rear_right": sensor[6],
                 "rear_left": sensor[5],
                 "front_left": sensor[0],
                 "front_center_left": sensor[1],
@@ -603,10 +493,21 @@ class RobotMovement:
                 "front_center_right": sensor[3],
                 "front_right": sensor[4],
             }
-            #aw(self.node.unlock())
             return sensorDict
         else:
-            print("robot not connected")
+            if not self.debug:
+                print("robot not connected")
+            else:
+                sensorDict = {
+                    "rear_right": 0,
+                    "rear_left": 0,
+                    "front_left": 0,
+                    "front_center_left": 0,
+                    "front_center": 0,
+                    "front_center_right": 0,
+                    "front_right": 0,
+                }
+                return sensorDict
 
     def get_button_pressed(self):
         """
@@ -616,23 +517,33 @@ class RobotMovement:
         """
 
         if self.node is not None:
-            #aw(self.node.lock())
             aw(self.client.wait_for_status(self.client.NODE_STATUS_READY))
-            self.client.aw(self.node.wait_for_variables({"button.backward", "button.left", "button.right", "button.forward", "button.center"}))
+            self.client.aw(self.node.wait_for_variables(
+                {"button.backward", "button.left", "button.right", "button.forward", "button.center"}))
             buttonDict = {
-                "backward":self.node.v.button.backward,
+                "backward": self.node.v.button.backward,
                 "left": self.node.v.button.left,
                 "center": self.node.v.button.center,
                 "forward": self.node.v.button.forward,
                 "right": self.node.v.button.right,
             }
-            #aw(self.node.unlock())
             return buttonDict
         else:
-            print("robot not connected")
+            if not self.debug:
+                print("robot not connected")
+            else:
+                buttonDict = {
+                    "backward": 0,
+                    "left": 0,
+                    "center": 0,
+                    "forward": 0,
+                    "right": 0,
+                }
+                return buttonDict
+
     def get_all_variable(self):
         if self.node is not None:
-            #aw(self.node.lock())
+            # aw(self.node.lock())
             aw(self.client.wait_for_status(self.client.NODE_STATUS_READY))
             self.client.aw(self.node.wait_for_variables())
             # Get all attributes of node.v
@@ -646,51 +557,53 @@ class RobotMovement:
 
             for i in self.node.v.prox.horizontal:
                 print(i)
-            #aw(self.node.unlock())
+            # aw(self.node.unlock())
             return variable_values
         else:
             print("robot not connected")
 
 
 if __name__ == "__main__":
-        #print(f"Execution time: {execution_time:.6f} seconds")
-        execution_time = end_time - start_time
-        # Calculate and print the execution time
-        #robot.set_straight_speed(i)
-        end_time = time.time()  # Record the end time
-        #print(i)
-        #i=i+1
-        #print("waypoints left to reach : "+str(len(robot.get_waypoints())))
-        robotPosFromFusion = sensorfusion.get_estimated_position(robotPosFromEncoder, robotSpeedFromEncoder, robotPosFromCamera)
-        visualizer.update_plot(fameA, fameB, robotPosFromEncoder, robotPosFromCamera, robotPosFromFusion, goalPosFromCamera, waypoints)
-        robotSpeedFromEncoder = robot.get_speed()
-        robotPosFromEncoder = robot.get_position()
-        goalPosFromCamera = vision.get_goal_position()
-        robotPosFromCamera = vision.get_robot_position()
-        robot.update()
-        #time.sleep(0.5)
-        #i=-i
-        #robot.set_straight_speed(i)
-        #print(robot.get_button_pressed())
-        #print(robot.get_temperature())
-        #print(robot.get_all_variable())
-        #print(robot.get_proximity_ir_sensor())
-        start_time = time.time()  # Record the start time
-    while True:
-
-    robot.set_position(robotPosFromCamera)
-    robot.set_waypoints(waypoints)
-    waypoints = [np.array([800.0, 800.0, 0.0]), np.array([800.0, 1000.0, 0.0])]
-    print("goalPosFromCamera "+str(goalPosFromCamera))
-    print("robotPosFromCamera " + str(robotPosFromCamera))
-    goalPosFromCamera = vision.get_goal_position()
-    robotPosFromCamera = vision.get_robot_position()
-
-    fameB = vision.get_frame()
-    fameA = vision.generate_occupancy_grid()
-    visualizer = Visualisation(vision.get_pixel_side_mm())
-
-    sensorfusion = SensorFusion()
-    vision = VisionSystem(use_camera=True, cameraID=1, image_path=os.path.join("testData", "test.jpg"))
+    robot = RobotMovement(debug=False)  # debug=True -> dont need robot for simulation
     robot.connect()
-    robot = RobotMovement(debug=False) # debug=True -> dont need robot for simulation
+    vision = VisionSystem(use_camera=True, cameraID=1, image_path=os.path.join("testData", "test.jpg"))
+    sensorfusion = SensorFusion()
+
+    visualizer = Visualisation(vision.get_pixel_side_mm())
+    fameA = vision.generate_occupancy_grid()
+    fameB = vision.get_frame()
+
+    robotPosFromCamera = vision.get_robot_position()
+    goalPosFromCamera = vision.get_goal_position()
+    print("robotPosFromCamera " + str(robotPosFromCamera))
+    print("goalPosFromCamera " + str(goalPosFromCamera))
+    waypoints = [np.array([800.0, 800.0, 0.0]), np.array([800.0, 1000.0, 0.0])]
+    robot.set_waypoints(waypoints)
+    robot.set_position(robotPosFromCamera)
+
+    while True:
+        start_time = time.time()  # Record the start time
+        # print(robot.get_proximity_ir_sensor())
+        # print(robot.get_all_variable())
+        # print(robot.get_temperature())
+        # print(robot.get_button_pressed())
+        # i=-i
+        # robot.set_straight_speed(i)
+        # time.sleep(0.5)
+        robot.update()
+        robotPosFromCamera = vision.get_robot_position()
+        goalPosFromCamera = vision.get_goal_position()
+        robotPosFromEncoder = robot.get_position()
+        robotSpeedFromEncoder = robot.get_speed()
+        robotPosFromFusion = sensorfusion.get_estimated_position(robotPosFromEncoder, robotSpeedFromEncoder,
+                                                                 robotPosFromCamera)
+        visualizer.update_plot(fameA, fameB, robotPosFromEncoder, robotPosFromCamera, robotPosFromFusion,
+                               goalPosFromCamera, waypoints)
+        # print("waypoints left to reach : "+str(len(robot.get_waypoints())))
+        # i=i+1
+        # print(i)
+        # robot.set_straight_speed(i)
+        end_time = time.time()  # Record the end time
+        # Calculate and print the execution time
+        execution_time = end_time - start_time
+        # print(f"Execution time: {execution_time:.6f} seconds")
