@@ -564,6 +564,7 @@ class RobotMovement:
 
 
 if __name__ == "__main__":
+
     robot = RobotMovement(debug=False)  # debug=True -> dont need robot for simulation
     robot.connect()
     vision = VisionSystem(use_camera=True, cameraID=1, image_path=os.path.join("testData", "test.jpg"))

@@ -69,7 +69,6 @@ class VisionSystem:
             if frame is None:
                 print("Erreur lors de la capture de la frame depuis la caméra.")
             # Ensure the result directory exists
-
             return frame
         else:
             frame = cv2.imread(self.image_path)

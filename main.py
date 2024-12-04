@@ -27,15 +27,15 @@ def update_loop(robot):
 
 def main():
     #
-    robot = RobotMovement(debug=False) # debug=True -> dont need robot for simulation
-    robot.connect()
-    vision = VisionSystem(use_camera=True, cameraID=1, image_path=os.path.join("testData", "test.jpg"))
+    #robot = RobotMovement(debug=True) # debug=True -> dont need robot for simulation
+    #robot.connect()
+    vision = VisionSystem(use_camera=False, cameraID=1, image_path=os.path.join("testData", "test.jpg"))
     sensorfusion = SensorFusion()
     pathplanner = PathPlanner(pixel_size_mm=vision.get_pixel_side_mm())
     # Start a separate thread for the update loop
-    update_thread = threading.Thread(target=update_loop, args=(robot,))
-    update_thread.daemon = True  # Daemonize thread to exit when main program exits
-    update_thread.start()
+    #update_thread = threading.Thread(target=update_loop, args=(robot,))
+    #update_thread.daemon = True  # Daemonize thread to exit when main program exits
+    #update_thread.start()
     visualizer = Visualisation(vision.get_pixel_side_mm())
     fameA = vision.generate_occupancy_grid()
     fameB = vision.get_frame()
@@ -46,8 +46,8 @@ def main():
     goalPosFromCamera = vision.get_goal_position()
     occupancyGrid = vision.generate_occupancy_grid()
     waypoints = pathplanner.get_waypoints(occupancyGrid, robotPosFromCamera, goalPosFromCamera)
-    robot.set_waypoints(waypoints)
-    robot.set_position(robotPosFromCamera)
+    #robot.set_waypoints(waypoints)
+    #robot.set_position(robotPosFromCamera)
 
     # compute only once the waypoints.
     while True:
@@ -65,8 +65,8 @@ def main():
         # add a line to set pixel scale to the path finder
         robotPosFromCamera = vision.get_robot_position()
         goalPosFromCamera = vision.get_goal_position()
-        robotPosFromEncoder = robot.get_position()
-        robotSpeedFromEncoder = robot.get_speed()
+        robotPosFromEncoder = vision.get_robot_position()
+        robotSpeedFromEncoder = np.array([0.0, 0.0, 0.0, 0.0])
         elapsed_time = time.perf_counter() - start_time
         robotPosFromFusion = sensorfusion.get_estimated_position(robotPosFromEncoder, robotSpeedFromEncoder, robotPosFromCamera, delta_t=elapsed_time)
         #robot.set_position(robotPosFromFusion)
