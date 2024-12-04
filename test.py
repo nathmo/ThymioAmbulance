@@ -1,48 +1,84 @@
+import threading
 import time
 from robotmovement import RobotMovement
 from visionsystem import VisionSystem
 from sensorfusion import SensorFusion
 from pathplanner import PathPlanner
-from visualisation import *
 import numpy as np
-import matplotlib.pyplot as plt
+from visualisation import Visualisation
+import os
+
+
+def update_loop(robot):
+    """Function to run robot.update() in a separate thread at ~1 Hz."""
+    interval = 1  # 1000 ms interval (1 Hz)
+
+    while True:
+        start_time = time.perf_counter()  # Record the start time
+
+        # Call the update function
+        robot.update()
+
+        # Calculate the elapsed time and sleep for the remainder of the interval
+        elapsed_time = time.perf_counter() - start_time
+        sleep_time = max(0, interval - elapsed_time)  # Ensure non-negative sleep time
+        if (sleep_time == 0):
+            print("Fast loop cant keep up. please lower frequency or optimize better")
+        time.sleep(sleep_time)
 
 
 def main():
     #
-    robot = RobotMovement()
-    vision = VisionSystem()
+    vision = VisionSystem(use_camera=True, cameraID=2, image_path=os.path.join("testData", "test.jpg"))
     sensorfusion = SensorFusion()
+    pathplanner = PathPlanner(pixel_size_mm=vision.get_pixel_side_mm())
+    visualizer = Visualisation(vision.get_pixel_side_mm())
+    interval = 2  # 5000 ms interval (0.2 Hz)
+    fameA = vision.generate_occupancy_grid()
+    # compute only once the waypoints.
+    while True:
+        start_time = time.perf_counter()  # Record the start time
+        '''
+        - get the Camera position of the map and robot and the target 
+        - get the map layout (road line) (Camera)
+        - get the position from the robot encoder
+        - use sensorfusion to improve robot position
+        - update robot position
+        - use path planning to find best way (A*)
+        - update robot movement instruction
+        '''
 
-    # try using an image instead of the camera to speed up the test in the beginning.
-    if(vision.is_camera_ready() and False):
+
+        fameB = vision.get_frame()
+        # visualizer.update_background(fameA, fameB)
+
         robotPosFromCamera = vision.get_robot_position()
         goalPosFromCamera = vision.get_goal_position()
         occupancyGrid = vision.generate_occupancy_grid()
-    else:
-        print("camera Not Ready") # we use static data instead to simulate the input from the camera.
-        # Load the matrix and convert integers back to boolean
-        matrix = np.loadtxt("testData\\mapWithBlackObstacle1.txt", dtype=int)
-        # Convert the list of lists into a NumPy array
-        occupancyGrid = matrix.astype(bool)
-        robotPosFromCamera =np.array([1500, 2000, np.pi / 6]) # set a random value instead
-        goalPosFromCamera =np.array([1000, 4500, np.pi / 6])
-    print("robotPosFromCamera : " + str(robotPosFromCamera))
-    print("goalPosFromCamera : " + str(vision.get_goal_position()))
-    robotPosFromEncoder = np.array([1550,1950, np.pi / 6.05])# slightly different than the default camera one
-    robotSpeedFromEncoder = np.array([0, 0, 0]) #no speed
-    print("robotPosFromEncoder : " + str(robotPosFromEncoder))
-    print("robotSpeedFromEncoder : " + str(robotSpeedFromEncoder))
-    robotPosFromFusion = sensorfusion.get_estimated_position(robotPosFromEncoder, robotSpeedFromEncoder, robotPosFromCamera)
-    print("robotPosFromFusion : " + str(robotPosFromFusion))
-    waypoints = PathPlanner.get_waypoints(occupancyGrid, robotPosFromFusion, goalPosFromCamera)
-    print("waypoints : " + str(waypoints))
-    print("number of waypoints : " + str(len(waypoints)))
+        waypoints = pathplanner.get_waypoints(occupancyGrid, robotPosFromCamera, goalPosFromCamera)
 
-    plot_robot_grid(occupancyGrid, 10, robotPosFromEncoder, robotPosFromCamera, robotPosFromFusion, goalPosFromCamera, waypoints)
+        # add a line to set pixel scale to the path finder
+        robotPosFromCamera = vision.get_robot_position()
+        goalPosFromCamera = vision.get_goal_position()
+        robotPosFromEncoder = vision.get_robot_position()
+        robotSpeedFromEncoder = np.array([0.0, 0.0, 0.0, 0.0])
+        elapsed_time = time.perf_counter() - start_time
+        robotPosFromFusion = sensorfusion.get_estimated_position(robotPosFromEncoder, robotSpeedFromEncoder,
+                                                                 robotPosFromCamera, delta_t=elapsed_time)
+        # robot.set_position(robotPosFromFusion)
 
+        # Update plot dynamically
+        visualizer.update_plot(fameA, fameB, robotPosFromEncoder, robotPosFromCamera, robotPosFromFusion,
+                               goalPosFromCamera, waypoints)
+        # visualizer.update_background(fameA, fameB)
+
+        # Calculate the elapsed time and sleep for the remainder of the interval
+
+        sleep_time = max(0, interval - elapsed_time)  # Ensure non-negative sleep time
+        if (sleep_time == 0):
+            print("slow loop cant keep up. please lower frequency or optimize better")
+        time.sleep(sleep_time)
 
 
 if __name__ == "__main__":
-
     main()

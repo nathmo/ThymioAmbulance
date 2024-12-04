@@ -653,44 +653,44 @@ class RobotMovement:
 
 
 if __name__ == "__main__":
-        #print(f"Execution time: {execution_time:.6f} seconds")
-        execution_time = end_time - start_time
-        # Calculate and print the execution time
-        #robot.set_straight_speed(i)
-        end_time = time.time()  # Record the end time
-        #print(i)
-        #i=i+1
-        #print("waypoints left to reach : "+str(len(robot.get_waypoints())))
-        robotPosFromFusion = sensorfusion.get_estimated_position(robotPosFromEncoder, robotSpeedFromEncoder, robotPosFromCamera)
-        visualizer.update_plot(fameA, fameB, robotPosFromEncoder, robotPosFromCamera, robotPosFromFusion, goalPosFromCamera, waypoints)
-        robotSpeedFromEncoder = robot.get_speed()
-        robotPosFromEncoder = robot.get_position()
-        goalPosFromCamera = vision.get_goal_position()
-        robotPosFromCamera = vision.get_robot_position()
-        robot.update()
-        #time.sleep(0.5)
-        #i=-i
-        #robot.set_straight_speed(i)
-        #print(robot.get_button_pressed())
-        #print(robot.get_temperature())
-        #print(robot.get_all_variable())
-        #print(robot.get_proximity_ir_sensor())
-        start_time = time.time()  # Record the start time
-    while True:
-
-    robot.set_position(robotPosFromCamera)
-    robot.set_waypoints(waypoints)
-    waypoints = [np.array([800.0, 800.0, 0.0]), np.array([800.0, 1000.0, 0.0])]
-    print("goalPosFromCamera "+str(goalPosFromCamera))
-    print("robotPosFromCamera " + str(robotPosFromCamera))
+    #print(f"Execution time: {execution_time:.6f} seconds")
+    execution_time = end_time - start_time
+    # Calculate and print the execution time
+    #robot.set_straight_speed(i)
+    end_time = time.time()  # Record the end time
+    #print(i)
+    #i=i+1
+    #print("waypoints left to reach : "+str(len(robot.get_waypoints())))
+    robotPosFromFusion = sensorfusion.get_estimated_position(robotPosFromEncoder, robotSpeedFromEncoder, robotPosFromCamera)
+    visualizer.update_plot(fameA, fameB, robotPosFromEncoder, robotPosFromCamera, robotPosFromFusion, goalPosFromCamera, waypoints)
+    robotSpeedFromEncoder = robot.get_speed()
+    robotPosFromEncoder = robot.get_position()
     goalPosFromCamera = vision.get_goal_position()
     robotPosFromCamera = vision.get_robot_position()
+    robot.update()
+    #time.sleep(0.5)
+    #i=-i
+    #robot.set_straight_speed(i)
+    #print(robot.get_button_pressed())
+    #print(robot.get_temperature())
+    #print(robot.get_all_variable())
+    #print(robot.get_proximity_ir_sensor())
+    start_time = time.time()  # Record the start time
+    while True:
 
-    fameB = vision.get_frame()
-    fameA = vision.generate_occupancy_grid()
-    visualizer = Visualisation(vision.get_pixel_side_mm())
+        robot.set_position(robotPosFromCamera)
+        robot.set_waypoints(waypoints)
+        waypoints = [np.array([800.0, 800.0, 0.0]), np.array([800.0, 1000.0, 0.0])]
+        print("goalPosFromCamera "+str(goalPosFromCamera))
+        print("robotPosFromCamera " + str(robotPosFromCamera))
+        goalPosFromCamera = vision.get_goal_position()
+        robotPosFromCamera = vision.get_robot_position()
 
-    sensorfusion = SensorFusion()
-    vision = VisionSystem(use_camera=True, cameraID=1, image_path=os.path.join("testData", "test.jpg"))
-    robot.connect()
-    robot = RobotMovement(debug=False) # debug=True -> dont need robot for simulation
+        fameB = vision.get_frame()
+        fameA = vision.generate_occupancy_grid()
+        visualizer = Visualisation(vision.get_pixel_side_mm())
+
+        sensorfusion = SensorFusion()
+        vision = VisionSystem(use_camera=True, cameraID=1, image_path=os.path.join("testData", "test.jpg"))
+        robot.connect()
+        robot = RobotMovement(debug=False) # debug=True -> dont need robot for simulation
