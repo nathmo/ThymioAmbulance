@@ -73,10 +73,12 @@ class RobotSimulationApp:
         self.console_output.pack(pady=5)
 
         # Figure and Matplotlib
-        self.fig, self.ax = plt.subplots()
-        self.ax.set_xlim(0, 100)
-        self.ax.set_ylim(0, 100)
-        self.ax.set_title("Robot Simulation")
+        self.fig, (self.ax_main, self.ax_occupancy) = plt.subplots(1, 2, figsize=(10, 5))
+        self.ax_main.set_xlim(0, 100)
+        self.ax_main.set_ylim(0, 100)
+        self.ax_main.set_title("Robot Simulation")
+
+        self.ax_occupancy.set_title("Occupancy Grid")
 
         canvas = FigureCanvasTkAgg(self.fig, root)
         canvas_widget = canvas.get_tk_widget()
@@ -107,7 +109,7 @@ class RobotSimulationApp:
 
     def check_start_button(self):
         """Enable Start Simulation button if the conditions are met."""
-        if (not self.simulate_camera.get()) or self.selected_file.get() :
+        if (not self.simulate_camera.get()) or self.selected_file.get():
             self.start_button.config(state="normal")
         else:
             self.start_button.config(state="disabled")
@@ -125,10 +127,10 @@ class RobotSimulationApp:
         self.console_output.yview(tk.END)
 
     def update_plot(self, robotPosFromEncoder, robotPosFromCamera, robotPosFromFusion, goalPosFromCamera, waypoints,
-                    frame, scale):
-        self.ax.clear()
+                    frame, scale, occupancyGrid):
+        self.ax_main.clear()
         height, width = frame.shape[:2]
-        self.ax.imshow(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB), extent=[0, width * scale, 0, height * scale], origin='lower')
+        self.ax_main.imshow(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB), extent=[0, width * scale, 0, height * scale], origin='lower')
 
         # Plot positions
         self._plot_position(robotPosFromEncoder, 'blue', 'Robot Encoder Position')
@@ -139,18 +141,23 @@ class RobotSimulationApp:
         # Plot waypoints
         for idx, waypoint in enumerate(waypoints):
             x, y, theta = waypoint
-            self.ax.plot(x, y, 'x', color='cyan')
-            self.ax.annotate(f'WP{idx}', (x, y), textcoords="offset points",
-                             xytext=(5, 5), ha='center', color='cyan')
+            self.ax_main.plot(x, y, 'x', color='cyan')
+            self.ax_main.annotate(f'WP{idx}', (x, y), textcoords="offset points",
+                                  xytext=(5, 5), ha='center', color='cyan')
+
+        # Plot occupancy grid
+        self.ax_occupancy.clear()
+        self.ax_occupancy.imshow(occupancyGrid, cmap='gray_r', origin='lower',
+                                 extent=[0, width * scale, 0, height * scale], alpha=0.2)
 
         self.canvas.draw()
 
     def _plot_position(self, pos, color, label):
         if pos is not None:
             x, y, theta = pos
-            self.ax.plot(x, y, 'o', color=color, label=label)
-            self.ax.arrow(x, y, np.cos(theta) * 50, np.sin(theta) * 50, head_width=5, head_length=5, fc=color, ec=color)
-            self.ax.legend()
+            self.ax_main.plot(x, y, 'o', color=color, label=label)
+            self.ax_main.arrow(x, y, np.cos(theta) * 50, np.sin(theta) * 50, head_width=5, head_length=5, fc=color, ec=color)
+            self.ax_main.legend()
 
     def close(self):
         self.running = False
@@ -172,11 +179,21 @@ def simulation_thread(app):
 
         robotPosFromEncoder = robot.get_position()
         robotSpeedFromEncoder = robot.get_speed()
-        if not(np.array_equal(robotPosFromCamera, np.array([0.0, 0.0, 0.0])) or np.array_equal(goalPosFromCamera, np.array([0.0, 0.0, 0.0]))):
+
+        if np.array_equal(robotPosFromCamera, np.array([0.0, 0.0, 0.0])):
+            app.update_console("ArUco for robot not Found.")
+        else:
+            app.update_console("ArUco for robot Found: " + str(robotPosFromCamera))
+        if np.array_equal(goalPosFromCamera, np.array([0.0, 0.0, 0.0])):
+            app.update_console("ArUco for goal not Found.")
+        else:
+            app.update_console("ArUco for goal Found: " + str(goalPosFromCamera))
+
+        if not (np.array_equal(robotPosFromCamera, np.array([0.0, 0.0, 0.0])) or np.array_equal(goalPosFromCamera, np.array([0.0, 0.0, 0.0]))):
             robotPosFromFusion = sensorfusion.get_estimated_position(robotPosFromEncoder, robotSpeedFromEncoder, robotPosFromCamera)
         else:
             robotPosFromFusion = np.array([0.0, 0.0, 0.0])
-        #robot.set_position(robotPosFromFusion)
+
         # Update waypoints only if Path Planning is enabled or if waypoints are empty
         if app.simulate_pathplanning.get() or not app.waypoints:
             app.waypoints = pathplanning.get_waypoints(occupancyGrid, robotPosFromFusion, goalPosFromCamera)
@@ -186,18 +203,17 @@ def simulation_thread(app):
 
         frame = vision.get_frame()
         app.update_plot(robotPosFromEncoder, robotPosFromCamera, robotPosFromFusion, goalPosFromCamera, app.waypoints,
-                        frame, vision.get_pixel_side_mm())
+                        frame, vision.get_pixel_side_mm(), occupancyGrid)
         robot.update()
 
         if len(robot.get_waypoints()) < previousNumberOfWaypoints:
             previousNumberOfWaypoints = len(robot.get_waypoints())
-            app.update_console("waypoint Reached")
+            app.update_console("Waypoint Reached")
         sleep(1)
 
 
 if __name__ == "__main__":
     root = tk.Tk()
     app = RobotSimulationApp(root)
-
     root.protocol("WM_DELETE_WINDOW", app.close)
     root.mainloop()
