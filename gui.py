@@ -160,7 +160,7 @@ class RobotSimulationApp:
 # Thread-safe function to update the GUI
 def simulation_thread(app):
     robot = RobotMovement(debug=app.simulate_robot.get())
-    vision = VisionSystem(use_camera=(not app.simulate_camera.get()), cameraID=app.camera_id, image_path=app.selected_file.get())
+    vision = VisionSystem(use_camera=(not app.simulate_camera.get()), cameraID=app.camera_id.get(), image_path=app.selected_file.get())
     sensorfusion = SensorFusion()
     pathplanning = PathPlanner(pixel_size_mm=vision.get_pixel_side_mm())
 
