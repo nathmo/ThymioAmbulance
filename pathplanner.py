@@ -214,6 +214,9 @@ class PathPlanner:
         :param target: Target position (x, y, orientation).
         :return: List of waypoints.
         """
+        if np.array_equal(start, np.array([0.0, 0.0, 0.0])) or np.array_equal(target, np.array([0.0, 0.0, 0.0])):
+            return [np.array([0.0, 0.0, 0.0])] # if no goal or no target, exit
+
         if (self.init_enhanced_grid):
             self.enhanced_grid = self.compute_enhance_grid(occupancy_grid)
             self.init_enhanced_grid = False

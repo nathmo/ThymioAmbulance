@@ -18,7 +18,7 @@ class RobotSimulationApp:
         self.root.title("Robot Simulation")
 
         # Variables for simulation state
-        self.simulate_robot = tk.BooleanVar()
+        self.simulate_robot = tk.BooleanVar(value=True)
         self.simulate_camera = tk.BooleanVar(value=True)  # Start with camera simulation enabled
         self.simulate_movement = tk.BooleanVar()
         self.simulate_pathplanning = tk.BooleanVar()
@@ -172,8 +172,10 @@ def simulation_thread(app):
 
         robotPosFromEncoder = robot.get_position()
         robotSpeedFromEncoder = robot.get_speed()
-        robotPosFromFusion = sensorfusion.get_estimated_position(robotPosFromEncoder, robotSpeedFromEncoder,
-                                                                 robotPosFromCamera)
+        if not(np.array_equal(robotPosFromCamera, np.array([0.0, 0.0, 0.0])) or np.array_equal(goalPosFromCamera, np.array([0.0, 0.0, 0.0]))):
+            robotPosFromFusion = sensorfusion.get_estimated_position(robotPosFromEncoder, robotSpeedFromEncoder, robotPosFromCamera)
+        else:
+            robotPosFromFusion = np.array([0.0, 0.0, 0.0])
         #robot.set_position(robotPosFromFusion)
         # Update waypoints only if Path Planning is enabled or if waypoints are empty
         if app.simulate_pathplanning.get() or not app.waypoints:
