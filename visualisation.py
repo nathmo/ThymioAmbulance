@@ -88,7 +88,7 @@ class Visualisation:
         # Plot waypoints
         for idx, waypoint in enumerate(waypoints):
             x, y, theta = waypoint
-            y = self.height * self.gridSquareSizeMM - y  # Adjust for top-left origin
+            #y = self.height * self.gridSquareSizeMM - y  # Adjust for top-left origin
             self.ax.plot(x, y, 'x', color='orange')
             self.ax.annotate(f'WP{idx}', (x, y), textcoords="offset points",
                              xytext=(5, 5), ha='center', color='orange')
@@ -129,7 +129,7 @@ class Visualisation:
         def plot_position_with_orientation(position, color, label, plot_height):
             x, y, theta = position
             # Adjust y to assume origin is at the upper-left corner
-            y = plot_height - y
+            y = y
             ax.plot(x, y, 'o', color=color, label=label)
             ax.arrow(x, y, np.cos(theta) * 10, np.sin(theta) * 10, head_width=5, head_length=5, fc=color, ec=color)
 
