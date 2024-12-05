@@ -27,9 +27,9 @@ def update_loop(robot):
 
 def main():
     #
-    #robot = RobotMovement(debug=True) # debug=True -> dont need robot for simulation
-    #robot.connect()
-    vision = VisionSystem(use_camera=False, cameraID=1, image_path=os.path.join("testData", "test.jpg"))
+    robot = RobotMovement()#debug=False) # debug=True -> dont need robot for simulation
+    robot.connect()
+    vision = VisionSystem(use_camera=True, cameraID=1, image_path=os.path.join("testData", "test.jpg"))
     sensorfusion = SensorFusion()
     pathplanner = PathPlanner(pixel_size_mm=vision.get_pixel_side_mm())
     # Start a separate thread for the update loop
@@ -68,10 +68,12 @@ def main():
         robotPosFromEncoder = vision.get_robot_position()
         robotSpeedFromEncoder = np.array([0.0, 0.0, 0.0, 0.0])
         elapsed_time = time.perf_counter() - start_time
+        # robot.set_position(robotPosFromEncoder)
         robotPosFromFusion = sensorfusion.get_estimated_position(robotPosFromEncoder, robotSpeedFromEncoder, robotPosFromCamera, delta_t=elapsed_time)
-        #robot.set_position(robotPosFromFusion)
-
+        robot.set_position(robotPosFromFusion)
+        robot.update()
         # Update plot dynamically
+        fameB = vision.get_frame()
         visualizer.update_plot(fameA, fameB, robotPosFromEncoder, robotPosFromCamera, robotPosFromFusion, goalPosFromCamera, waypoints)
         #visualizer.update_background(fameA, fameB)
         
